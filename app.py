@@ -79,6 +79,13 @@ def card_data(c: dict) -> dict:
         iuri_front = top_iuri or (faces[0].get("image_uris") if faces else {}) or {}
         iuri_back  = {}
 
+    # type_line: prefer top-level; DFCs use front face
+    type_line = (
+        c.get("type_line")
+        or (faces[0].get("type_line") if faces else "")
+        or ""
+    )
+
     return {
         "id":               c["id"],
         "name":             c["name"],
@@ -87,6 +94,7 @@ def card_data(c: dict) -> dict:
         "collector_number": c.get("collector_number", ""),
         "lang":             c.get("lang", "en"),
         "is_dfc":           is_dfc,
+        "type_line":        type_line,
         "thumb":            iuri_front.get("small", ""),
         "normal":           iuri_front.get("normal", ""),
         "png":              iuri_front.get("png", ""),
@@ -115,10 +123,23 @@ def index():
 
 @app.route("/api/search")
 def search():
-    q = request.args.get("q", "").strip()
+    q    = request.args.get("q", "").strip()
+    lang = request.args.get("lang", "en").strip() or "en"
     if not q:
         return jsonify([])
-    # lang:en garante impressão inglesa; unique=cards = 1 resultado por nome
+
+    if lang != "en":
+        # Tenta no idioma solicitado primeiro
+        query = f"({q}) lang:{lang}"
+        r = scryfall(f"{SCRYFALL}/cards/search", q=query, order="name", unique="cards")
+        if r.ok:
+            results = r.json().get("data", [])[:20]
+            if results:
+                return jsonify([card_data(c) for c in results])
+        # Fallback para inglês se não encontrou resultados
+        lang = "en"
+
+    # Inglês (padrão ou fallback)
     query = f"({q}) lang:en"
     r = scryfall(f"{SCRYFALL}/cards/search", q=query, order="name", unique="cards")
     if r.status_code == 404:
@@ -135,14 +156,52 @@ def search():
 def card_by_set(set_code: str, number: str):
     """
     Busca carta pelo set code + collector number exatos.
-    Garante inglês: tenta direto; se não for en, busca a versão en pelo oracle_id.
+    Se lang != en, tenta encontrar uma impressão naquele idioma via oracle_id.
+    Se não achar, retorna inglês com lang_fallback=True.
     Ex: /api/card-by-set/pip/325  ou  /api/card-by-set/40k/86★
     """
+    lang = request.args.get("lang", "en").strip() or "en"
+
     r = scryfall(f"{SCRYFALL}/cards/{set_code.lower()}/{number}")
     if not r.ok:
         return jsonify({"error": f"Carta não encontrada: ({set_code}) {number}"}), 404
     c = r.json()
 
+    if lang != "en":
+        # Tenta encontrar impressão no idioma solicitado via oracle_id
+        oracle_id = c.get("oracle_id", "")
+        if oracle_id:
+            r2 = scryfall(
+                f"{SCRYFALL}/cards/search",
+                q=f'oracleid:"{oracle_id}" lang:{lang}',
+                order="released",
+                unique="prints",
+            )
+            if r2.ok:
+                prints = r2.json().get("data", [])
+                lang_prints = [p for p in prints if p.get("lang") == lang]
+                if lang_prints:
+                    return jsonify(card_data(lang_prints[0]))
+        # Não encontrou no idioma — usa inglês com indicador de fallback
+        data = card_data(c)
+        # Garante inglês: se a carta retornada não for en, busca impressão en
+        if c.get("lang", "en") != "en":
+            oracle_id = c.get("oracle_id", "")
+            if oracle_id:
+                r3 = scryfall(
+                    f"{SCRYFALL}/cards/search",
+                    q=f'oracleid:"{oracle_id}" lang:en',
+                    order="released",
+                    unique="prints",
+                )
+                if r3.ok:
+                    en_prints = [p for p in r3.json().get("data", []) if p.get("lang") == "en"]
+                    if en_prints:
+                        data = card_data(en_prints[0])
+        data["lang_fallback"] = True
+        return jsonify(data)
+
+    # Idioma inglês: comportamento original
     # Se não for inglês, busca a impressão EN pelo oracle_id
     if c.get("lang", "en") != "en":
         oracle_id = c.get("oracle_id", "")

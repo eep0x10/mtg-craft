@@ -861,6 +861,191 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 /* ─── Custom image URL section ───────────────────────────────── */
 .img-url-row { display: flex; gap: 6px; margin-top: 12px; }
 .img-url-row input { flex: 1; }
+
+/* ═══════════════════════════════════════════════════════════════
+   CARD GRID (deck list)
+═══════════════════════════════════════════════════════════════ */
+#deckList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+
+.cgr-item {
+  position: relative;
+  cursor: default;
+}
+
+.cgr-thumb {
+  position: relative;
+  border-radius: 5px;
+  overflow: hidden;
+  aspect-ratio: 63 / 88;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+}
+.cgr-item:hover .cgr-thumb {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0,0,0,.7);
+  border-color: var(--gold2);
+}
+.cgr-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cgr-qty {
+  position: absolute;
+  top: 3px; right: 3px;
+  background: rgba(0,0,0,.82);
+  color: var(--gold);
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+.cgr-dfc {
+  position: absolute;
+  top: 3px; left: 3px;
+  background: var(--purple);
+  color: #e0d8ff;
+  font-size: 7px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+.cgr-actions {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,.92) 55%);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 8px 3px 4px;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.cgr-item:hover .cgr-actions { opacity: 1; }
+.cgr-btn {
+  width: 22px; height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .1s;
+  line-height: 1;
+}
+.cgr-btn:hover { background: rgba(201,168,76,.5); }
+.cgr-btn.rm:hover { background: rgba(200,50,50,.7); }
+.cgr-name {
+  font-size: 9px;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 3px;
+  text-align: center;
+  line-height: 1.2;
+  padding: 0 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CARD HOVER PREVIEW
+═══════════════════════════════════════════════════════════════ */
+#cardHoverImg {
+  position: fixed;
+  z-index: 9999;
+  width: 220px;
+  border-radius: 12px;
+  box-shadow: 0 12px 48px rgba(0,0,0,.85), 0 0 0 1px rgba(201,168,76,.25);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(.92);
+  transition: opacity .18s, transform .18s;
+  display: block;
+}
+#cardHoverImg.show { opacity: 1; transform: scale(1); }
+
+/* ═══════════════════════════════════════════════════════════════
+   WORKBENCH — DECK STATS
+═══════════════════════════════════════════════════════════════ */
+.wb-panel-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.deck-stats-block {
+  padding: 10px 14px 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.dsb-title {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--gold2);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+.dsb-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 14px;
+}
+.dsb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.dsb-lbl { color: var(--text2); }
+.dsb-val { color: var(--gold); font-weight: 700; font-family: 'Cinzel', serif; min-width: 20px; text-align: right; }
+.dsb-val.zero { color: var(--muted); font-weight: 400; font-family: 'Inter', sans-serif; }
+
+.wb-preview-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 10px;
+  background: radial-gradient(ellipse 120% 80% at 50% 50%, rgba(10,8,20,1) 0%, var(--bg) 100%);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LANGUAGE SELECTOR (header)
+═══════════════════════════════════════════════════════════════ */
+.lang-select {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--text2);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.lang-select:focus, .lang-select:hover { border-color: var(--gold2); color: var(--text); }
+
+@media (max-width: 767px) {
+  /* card grid on mobile: smaller cards */
+  #deckList { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 6px; }
+  .deck-stats-block { display: none; } /* hide on mobile to save space */
+}
 </style>
 </head>
 <body>
@@ -876,6 +1061,19 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
   </div>
   <div class="hdr-pill">63 × 88 mm</div>
   <div class="hdr-pill">300 DPI</div>
+  <select class="lang-select" id="langSelect" title="Idioma das cartas">
+    <option value="en">🌐 English</option>
+    <option value="pt">🇧🇷 Português</option>
+    <option value="fr">🇫🇷 Français</option>
+    <option value="de">🇩🇪 Deutsch</option>
+    <option value="es">🇪🇸 Español</option>
+    <option value="it">🇮🇹 Italiano</option>
+    <option value="ja">🇯🇵 日本語</option>
+    <option value="ko">🇰🇷 한국어</option>
+    <option value="ru">🇷🇺 Русский</option>
+    <option value="zhs">🇨🇳 简体中文</option>
+    <option value="zht">🇹🇼 繁體中文</option>
+  </select>
   <span id="hdrStats"></span>
 </header>
 
@@ -985,6 +1183,7 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
   <div class="panel-header">
     <span class="panel-icon">📋</span>
     <span class="panel-title">Lista do Deck</span>
+    <span id="deckCountBadge" style="margin-left:auto;font-size:10px;color:var(--muted)"></span>
   </div>
   <div class="panel-body" style="padding: 12px 14px">
     <div id="deckList">
@@ -1016,17 +1215,34 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
   </div>
 </div>
 
-<!-- ════════════════════════ PAINEL 3: PREVIEW ════════════════ -->
+<!-- ════════════════════════ PAINEL 3: WORKBENCH ═════════════ -->
 <div class="panel" style="border-right:none">
   <div class="panel-header">
-    <span class="panel-icon">👁</span>
-    <span class="panel-title">Preview</span>
+    <span class="panel-icon">⚗️</span>
+    <span class="panel-title">Workbench</span>
   </div>
-  <div class="panel-body preview-bg">
-    <div id="preview">
-      <div class="empty-state">
-        <span class="es-icon">🖨️</span>
-        O preview das folhas aparece aqui conforme você adiciona cartas
+  <div class="wb-panel-body">
+    <!-- Deck stats block -->
+    <div class="deck-stats-block" id="deckStats">
+      <div class="dsb-title">Composição do Deck</div>
+      <div class="dsb-grid" id="dsbGrid">
+        <div class="dsb-row"><span class="dsb-lbl">🐉 Criaturas</span><span class="dsb-val zero" id="dsbCreature">0</span></div>
+        <div class="dsb-row"><span class="dsb-lbl">⚡ Instantâneos</span><span class="dsb-val zero" id="dsbInstant">0</span></div>
+        <div class="dsb-row"><span class="dsb-lbl">🌀 Feitiços</span><span class="dsb-val zero" id="dsbSorcery">0</span></div>
+        <div class="dsb-row"><span class="dsb-lbl">🏔️ Terrenos</span><span class="dsb-val zero" id="dsbLand">0</span></div>
+        <div class="dsb-row"><span class="dsb-lbl">⚙️ Artefatos</span><span class="dsb-val zero" id="dsbArtifact">0</span></div>
+        <div class="dsb-row"><span class="dsb-lbl">🌿 Encantamentos</span><span class="dsb-val zero" id="dsbEnchantment">0</span></div>
+        <div class="dsb-row"><span class="dsb-lbl">✨ Planeswalkers</span><span class="dsb-val zero" id="dsbPlaneswalker">0</span></div>
+        <div class="dsb-row"><span class="dsb-lbl">📦 Outros</span><span class="dsb-val zero" id="dsbOther">0</span></div>
+      </div>
+    </div>
+    <!-- Preview scrollable -->
+    <div class="wb-preview-scroll" id="previewScroll">
+      <div id="preview">
+        <div class="empty-state">
+          <span class="es-icon">🖨️</span>
+          O preview das folhas aparece aqui conforme você adiciona cartas
+        </div>
       </div>
     </div>
   </div>
@@ -1043,7 +1259,7 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
     <span class="mnav-icon">📋</span>Deck
   </button>
   <button class="mnav-btn" data-panel="2">
-    <span class="mnav-icon">👁</span>Preview
+    <span class="mnav-icon">⚗️</span>Workbench
   </button>
 </nav>
 
@@ -1063,6 +1279,20 @@ const PDF = {
 };
 const SCALE = 0.403;
 const pt = v => `${(v * SCALE).toFixed(2)}px`;
+
+let activeLang = 'en';
+
+function cardCategory(typeStr) {
+  const t = (typeStr || '').toLowerCase();
+  if (t.includes('land'))         return 'land';
+  if (t.includes('creature'))     return 'creature';
+  if (t.includes('planeswalker')) return 'planeswalker';
+  if (t.includes('instant'))      return 'instant';
+  if (t.includes('sorcery'))      return 'sorcery';
+  if (t.includes('artifact'))     return 'artifact';
+  if (t.includes('enchantment'))  return 'enchantment';
+  return 'other';
+}
 
 function cardSlots() {
   const slots = [];
@@ -1102,6 +1332,13 @@ document.querySelectorAll('#inputTabs .tab').forEach(tab => {
   });
 });
 
+document.getElementById('langSelect').addEventListener('change', e => {
+  activeLang = e.target.value;
+  const names = {en:'English',pt:'Português',fr:'Français',de:'Deutsch',es:'Español',it:'Italiano',ja:'日本語',ko:'한국어',ru:'Русский',zhs:'简体中文',zht:'繁體中文'};
+  const msg = activeLang === 'en' ? 'Idioma: English' : `Idioma: ${names[activeLang]} (inglês como fallback)`;
+  toast(msg, '');
+});
+
 // ═══════════════════════════════════════════════════════════════
 // Search
 // ═══════════════════════════════════════════════════════════════
@@ -1120,7 +1357,7 @@ async function doSearch() {
   const el = document.getElementById('searchResults');
   el.innerHTML = '<div class="empty-state"><span class="spinner"></span>Consultando Scryfall…</div>';
   try {
-    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&lang=${activeLang}`);
     const data = await r.json();
     if (!r.ok) {
       el.innerHTML = `<div class="empty-state" style="color:var(--danger)">${data.error || 'Erro no Scryfall'}</div>`;
@@ -1177,7 +1414,7 @@ async function resolveImportLines(log) {
       const name = mFull[2].trim(), set = mFull[3].toUpperCase(), num = mFull[4];
       displayName = `${name} (${set}) ${num}`;
       fetchFn = async () => {
-        const r = await fetch(`/api/card-by-set/${encodeURIComponent(set)}/${encodeURIComponent(num)}`);
+        const r = await fetch(`/api/card-by-set/${encodeURIComponent(set)}/${encodeURIComponent(num)}?lang=${activeLang}`);
         const d = await r.json();
         return r.ok ? [d] : [];
       };
@@ -1185,7 +1422,7 @@ async function resolveImportLines(log) {
       qty = parseInt(mName[1]) || 1;
       displayName = mName[2].trim();
       fetchFn = async () => {
-        const r = await fetch(`/api/search?q=!"${encodeURIComponent(displayName)}"`);
+        const r = await fetch(`/api/search?q=!"${encodeURIComponent(displayName)}"&lang=${activeLang}`);
         const d = await r.json();
         return Array.isArray(d) ? d : [];
       };
@@ -1200,7 +1437,8 @@ async function resolveImportLines(log) {
       const results = await fetchFn();
       if (results.length && results[0].png) {
         resolved.push({ card: results[0], qty });
-        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name} · ${(results[0].set_code||'').toUpperCase()}</div>`;
+        const fallback = results[0].lang_fallback ? ' <span style="color:var(--warn)">[EN fallback]</span>' : '';
+        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name} · ${(results[0].set_code||'').toUpperCase()}${fallback}</div>`;
         ok++;
       } else {
         log.innerHTML += `<div style="color:var(--warn)">⚠ Não encontrado: ${displayName}</div>`;
@@ -1407,9 +1645,14 @@ function renderDeck() {
   document.getElementById('hdrStats').textContent   =
     total ? `${total} carta${total>1?'s':''} · ${pages} pág.${dfc?' · '+dfc+' F/V':''}` : '';
 
+  const badge = document.getElementById('deckCountBadge');
+  if (badge) badge.textContent = total ? `${total} cartas` : '';
+
+  renderDeckStats();
+
   if (!deck.length) {
     el.innerHTML = `
-      <div class="empty-state">
+      <div class="empty-state" style="grid-column:1/-1">
         <span class="es-icon">⚗️</span>
         Nenhuma carta adicionada.<br>
         Busque no Scryfall, importe uma lista<br>ou faça upload de imagens.
@@ -1418,23 +1661,77 @@ function renderDeck() {
   }
 
   el.innerHTML = deck.map((c, i) => `
-    <div class="deck-item ${c.is_dfc ? 'is-dfc' : ''}">
-      <img src="${c.thumb||''}" alt="${c.name}" onerror="this.style.background='#222'">
-      <div class="di-info">
-        <div class="di-name">
-          ${c.name}
-          ${c.is_dfc ? '<span class="dfc-badge">↕ F/V</span>' : ''}
+    <div class="cgr-item"
+      data-idx="${i}"
+      data-img="${c.normal || c.thumb || ''}"
+      data-back="${c.back_thumb || ''}"
+    >
+      <div class="cgr-thumb">
+        <img src="${c.thumb||''}" alt="${c.name}" loading="lazy" onerror="this.style.background='#222'">
+        ${c.is_dfc ? '<span class="cgr-dfc">F/V</span>' : (c.lang && c.lang !== 'en' ? `<span class="cgr-dfc" style="background:var(--warn);color:#1a0f00">${c.lang.toUpperCase()}</span>` : '')}
+        <span class="cgr-qty">${c.qty}</span>
+        <div class="cgr-actions">
+          <button class="cgr-btn" onclick="changeQty(${i},-1)" title="Remover 1">−</button>
+          <button class="cgr-btn rm" onclick="removeCard(${i})" title="Excluir">×</button>
+          <button class="cgr-btn" onclick="changeQty(${i},+1)" title="Adicionar 1">+</button>
         </div>
-        <div class="di-set">${c.set_name || 'Upload'}</div>
       </div>
-      <div class="qty-ctrl">
-        <button class="qty-btn" onclick="changeQty(${i},-1)">−</button>
-        <span class="qty-val">${c.qty}</span>
-        <button class="qty-btn" onclick="changeQty(${i},+1)">+</button>
-      </div>
-      <button class="rm-btn" onclick="removeCard(${i})" title="Remover">×</button>
+      <div class="cgr-name">${c.name}</div>
     </div>
   `).join('');
+
+  // Hover preview
+  attachCardHover();
+}
+
+function renderDeckStats() {
+  const counts = {creature:0,land:0,instant:0,sorcery:0,artifact:0,enchantment:0,planeswalker:0,other:0};
+  for (const c of deck) {
+    counts[cardCategory(c.type_line)] += c.qty;
+  }
+  const map = {creature:'dsbCreature',land:'dsbLand',instant:'dsbInstant',sorcery:'dsbSorcery',artifact:'dsbArtifact',enchantment:'dsbEnchantment',planeswalker:'dsbPlaneswalker',other:'dsbOther'};
+  for (const [cat, id] of Object.entries(map)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.textContent = counts[cat];
+    el.className = 'dsb-val' + (counts[cat] === 0 ? ' zero' : '');
+  }
+}
+
+// Create single hover image element
+const hoverImg = document.createElement('img');
+hoverImg.id = 'cardHoverImg';
+document.body.appendChild(hoverImg);
+let hoverTimer;
+
+function attachCardHover() {
+  document.querySelectorAll('.cgr-item').forEach(item => {
+    item.addEventListener('mouseenter', e => {
+      const imgSrc = item.dataset.img;
+      if (!imgSrc) return;
+      clearTimeout(hoverTimer);
+      hoverImg.src = imgSrc;
+      positionHoverImg(e);
+      hoverImg.classList.add('show');
+    });
+    item.addEventListener('mousemove', positionHoverImg);
+    item.addEventListener('mouseleave', () => {
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => hoverImg.classList.remove('show'), 80);
+    });
+  });
+}
+
+function positionHoverImg(e) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const imgW = 220, imgH = 307; // approx card proportions
+  let x = e.clientX + 18;
+  let y = e.clientY - imgH / 2;
+  if (x + imgW > W - 8) x = e.clientX - imgW - 18;
+  if (y < 8) y = 8;
+  if (y + imgH > H - 8) y = H - imgH - 8;
+  hoverImg.style.left = x + 'px';
+  hoverImg.style.top  = y + 'px';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1649,8 +1946,8 @@ function renderSavedDecks() {
         <div class="sdi-name">${d.name}</div>
         <div class="sdi-meta">${d.totalCards} carta${d.totalCards!==1?'s':''} · ${new Date(d.savedAt).toLocaleDateString('pt-BR')}</div>
       </div>
-      <button class="sdi-load" onclick="loadSavedDeck(${JSON.stringify(d.name)})">Carregar</button>
-      <button class="sdi-del" onclick="deleteSavedDeck(${JSON.stringify(d.name)})" title="Excluir">×</button>
+      <button class="sdi-load" onclick='loadSavedDeck(${JSON.stringify(d.name)})'>Carregar</button>
+      <button class="sdi-del" onclick='deleteSavedDeck(${JSON.stringify(d.name)})' title="Excluir">×</button>
     </div>
   `).join('');
 }
@@ -1711,14 +2008,14 @@ async function importDeckByUrl() {
     if (entry.set && entry.number) {
       displayName = `${entry.name} (${entry.set}) ${entry.number}`;
       fetchFn = async () => {
-        const r = await fetch(`/api/card-by-set/${encodeURIComponent(entry.set)}/${encodeURIComponent(entry.number)}`);
+        const r = await fetch(`/api/card-by-set/${encodeURIComponent(entry.set)}/${encodeURIComponent(entry.number)}?lang=${activeLang}`);
         const d = await r.json();
         return r.ok ? [d] : [];
       };
     } else {
       displayName = entry.name;
       fetchFn = async () => {
-        const r = await fetch(`/api/search?q=!"${encodeURIComponent(entry.name)}"`);
+        const r = await fetch(`/api/search?q=!"${encodeURIComponent(entry.name)}"&lang=${activeLang}`);
         const d = await r.json();
         return Array.isArray(d) ? d : [];
       };
@@ -1730,7 +2027,8 @@ async function importDeckByUrl() {
       const results = await fetchFn();
       if (results.length && results[0].png) {
         addCard(results[0], entry.qty || 1);
-        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name}</div>`;
+        const fallback = results[0].lang_fallback ? ' <span style="color:var(--warn)">[EN]</span>' : '';
+        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name}${fallback}</div>`;
         ok++;
       } else {
         log.innerHTML += `<div style="color:var(--warn)">⚠ ${displayName}</div>`;
@@ -1745,6 +2043,7 @@ async function importDeckByUrl() {
   }
   log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ ${deckName}: ${ok} OK · ${fail} falha(s)</div>`;
   log.scrollTop = log.scrollHeight;
+  if (isMobile()) switchMobilePanel(1);
   if (deckName) {
     document.getElementById('saveDeckName').value = deckName;
   }
