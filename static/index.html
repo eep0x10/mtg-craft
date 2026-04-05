@@ -867,9 +867,11 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 ═══════════════════════════════════════════════════════════════ */
 #deckList {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
   align-content: start;
+  min-width: 0;
+  width: 100%;
 }
 
 .cgr-item {
@@ -948,15 +950,19 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 .cgr-btn:hover { background: rgba(201,168,76,.5); }
 .cgr-btn.rm:hover { background: rgba(200,50,50,.7); }
 .cgr-name {
-  font-size: 9px;
-  color: var(--text2);
+  font-size: 10px;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 3px;
+  margin-top: 4px;
   text-align: center;
-  line-height: 1.2;
+  line-height: 1.3;
   padding: 0 2px;
+}
+
+@media (max-width: 767px) {
+  #deckList { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1042,9 +1048,7 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 .lang-select:focus, .lang-select:hover { border-color: var(--gold2); color: var(--text); }
 
 @media (max-width: 767px) {
-  /* card grid on mobile: smaller cards */
-  #deckList { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 6px; }
-  .deck-stats-block { display: none; } /* hide on mobile to save space */
+  .deck-stats-block { display: none; }
 }
 </style>
 </head>
@@ -1469,24 +1473,77 @@ function applyResolved(targetDeck, resolved, replace) {
   }
 }
 
-// ── Botão "→ Deck atual" ──────────────────────────────────────
+// ── Botão "→ Deck atual" — adiciona cartas uma a uma em tempo real ───
 document.getElementById('importBtn').addEventListener('click', async () => {
-  const log = document.getElementById('importLog');
-  const btn = document.getElementById('importBtn');
-  btn.disabled = true;
+  const log     = document.getElementById('importLog');
+  const btn     = document.getElementById('importBtn');
   const replace = document.getElementById('replaceMode').checked;
+  const text    = document.getElementById('importArea').value.trim();
+  if (!text) return;
+  btn.disabled = true;
+  log.innerHTML = '';
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  let ok = 0, fail = 0;
 
-  const result = await resolveImportLines(log);
-  if (!result) { btn.disabled = false; return; }
-  const { resolved, ok, fail } = result;
+  for (const line of lines) {
+    const mFull = line.match(RE_FULL);
+    const mName = !mFull && line.match(RE_NAME);
+    let qty, displayName, fetchFn;
 
-  applyResolved(deck, resolved, replace);
-  renderDeck();
-  renderPreview();
+    if (mFull) {
+      qty = parseInt(mFull[1]) || 1;
+      const name = mFull[2].trim(), set = mFull[3].toUpperCase(), num = mFull[4];
+      displayName = `${name} (${set}) ${num}`;
+      fetchFn = async () => {
+        const r = await fetch(`/api/card-by-set/${encodeURIComponent(set)}/${encodeURIComponent(num)}?lang=${activeLang}`);
+        const d = await r.json();
+        return r.ok ? [d] : [];
+      };
+    } else if (mName) {
+      qty = parseInt(mName[1]) || 1;
+      displayName = mName[2].trim();
+      fetchFn = async () => {
+        const r = await fetch(`/api/search?q=!"${encodeURIComponent(displayName)}"&lang=${activeLang}`);
+        const d = await r.json();
+        return Array.isArray(d) ? d : [];
+      };
+    } else {
+      log.innerHTML += `<div style="color:var(--muted)">— ${line}</div>`;
+      continue;
+    }
+
+    log.innerHTML += `<div style="color:var(--text2)">🔍 ${displayName}…</div>`;
+    log.scrollTop = log.scrollHeight;
+    try {
+      const results = await fetchFn();
+      if (results.length && results[0].png) {
+        // Adiciona imediatamente ao deck
+        if (replace) {
+          const idx = deck.findIndex(d => d.id === results[0].id);
+          if (idx >= 0) { deck[idx].qty = qty; renderDeck(); renderPreview(); }
+          else addCard(results[0], qty, true);
+        } else {
+          addCard(results[0], qty, true);
+        }
+        const fb = results[0].lang_fallback ? ' <span style="color:var(--warn)">[EN]</span>' : '';
+        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name} · ${(results[0].set_code||'').toUpperCase()}${fb}</div>`;
+        ok++;
+      } else {
+        log.innerHTML += `<div style="color:var(--warn)">⚠ Não encontrado: ${displayName}</div>`;
+        fail++;
+      }
+    } catch {
+      log.innerHTML += `<div style="color:var(--danger)">✗ Erro: ${displayName}</div>`;
+      fail++;
+    }
+    log.scrollTop = log.scrollHeight;
+    await new Promise(r => setTimeout(r, 100));
+  }
 
   log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ Concluído: ${ok} OK · ${fail} falha(s)</div>`;
   log.scrollTop = log.scrollHeight;
   btn.disabled = false;
+  if (ok > 0) toast(`${ok} carta${ok>1?'s':''} adicionada${ok>1?'s':''}`, 'ok');
 });
 
 // ── Botão "💾 Novo deck…" ─────────────────────────────────────
@@ -1607,7 +1664,7 @@ async function uploadFiles(files) {
 // ═══════════════════════════════════════════════════════════════
 // Deck
 // ═══════════════════════════════════════════════════════════════
-function addCard(card, qty = 1) {
+function addCard(card, qty = 1, silent = false) {
   const existing = deck.find(d => d.id === card.id);
   if (existing) {
     existing.qty = Math.min(20, existing.qty + qty);
@@ -1616,9 +1673,10 @@ function addCard(card, qty = 1) {
   }
   renderDeck();
   renderPreview();
-  toast(`${card.name} adicionada`, 'ok');
-  // Mobile: switch to deck panel after adding a card
-  if (typeof isMobile === 'function' && isMobile()) switchMobilePanel(1);
+  if (!silent) {
+    toast(`${card.name} adicionada`, 'ok');
+    if (typeof isMobile === 'function' && isMobile()) switchMobilePanel(1);
+  }
 }
 
 function removeCard(idx) {
@@ -1651,14 +1709,17 @@ function renderDeck() {
   renderDeckStats();
 
   if (!deck.length) {
+    el.style.display = 'block';
     el.innerHTML = `
-      <div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-state">
         <span class="es-icon">⚗️</span>
         Nenhuma carta adicionada.<br>
         Busque no Scryfall, importe uma lista<br>ou faça upload de imagens.
       </div>`;
     return;
   }
+
+  el.style.display = '';   // restaura grid
 
   el.innerHTML = deck.map((c, i) => `
     <div class="cgr-item"
@@ -1676,7 +1737,7 @@ function renderDeck() {
           <button class="cgr-btn" onclick="changeQty(${i},+1)" title="Adicionar 1">+</button>
         </div>
       </div>
-      <div class="cgr-name">${c.name}</div>
+      <div class="cgr-name" title="${c.name}">${c.name}</div>
     </div>
   `).join('');
 
