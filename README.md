@@ -1,4 +1,4 @@
-# Card Print Studio
+# MTG Craft
 
 > Gerador de folhas de impressão para cartas de Magic: The Gathering — A4, 3×3, corte perfeito.
 
@@ -9,7 +9,7 @@ Busca imagens em alta resolução diretamente do Scryfall (PNG 745×1040px), ger
 ## ✦ Funcionalidades
 
 | Recurso | Descrição |
-|---|---|
+| --- | --- |
 | **Busca Scryfall** | Autocomplete por nome, resultado sempre em inglês |
 | **Importar lista** | Cola texto no formato Moxfield/Scryfall Export (`4 Lightning Bolt (M10) 146`) |
 | **Import por URL** | Cole uma URL do **Moxfield** ou **Archidekt** e importe o deck inteiro |
@@ -19,6 +19,7 @@ Busca imagens em alta resolução diretamente do Scryfall (PNG 745×1040px), ger
 | **Preview A4** | Visualize as folhas em tempo real, com proporções exatas do PDF |
 | **DFC duplex** | PDF separado com frentes e versos em colunas espelhadas (flip long-edge) |
 | **Alta qualidade** | PNG 745×1040px do Scryfall em todas as cartas |
+| **Mobile** | Interface responsiva — funciona em celular |
 
 ---
 
@@ -34,7 +35,7 @@ Busca imagens em alta resolução diretamente do Scryfall (PNG 745×1040px), ger
 
 Cartas de frente e verso são extraídas para um PDF separado (`dfc_frente_verso.pdf`). As páginas de verso têm colunas espelhadas horizontalmente para que, ao imprimir em modo duplex **long-edge flip**, cada verso se alinhe perfeitamente com a frente correspondente.
 
-```
+```text
 Frente: [A][B][_]     Verso:  [_][B'][A']
         [_][_][_]  →          [_][_][_]
         [_][_][_]             [_][_][_]
@@ -52,13 +53,13 @@ Quando há DFCs, o app retorna um ZIP com ambos os PDFs.
 - pip
 
 ```bash
-cd card-print-studio
+cd mtg-craft
 pip install -r requirements.txt
 ```
 
 ### Dependências
 
-```
+```text
 flask>=3.0
 pymupdf>=1.24
 requests>=2.31
@@ -72,12 +73,12 @@ requests>=2.31
 python3 app.py
 ```
 
-Acesse: **http://localhost:5001**
+Acesse: <http://localhost:5001>
 
 No Windows sem Python nativo, use WSL2:
 
 ```bat
-wsl -e bash -c "cd /mnt/c/path/to/card-print-studio && python3 app.py"
+wsl -e bash -c "cd /mnt/c/path/to/mtg-craft && python3 app.py"
 ```
 
 Ou use o `start.bat` incluído.
@@ -88,7 +89,7 @@ Ou use o `start.bat` incluído.
 
 ### Formato texto (aba Lista)
 
-```
+```text
 4 Lightning Bolt (M10) 146
 1 Teferi, Hero of Dominaria (DOM) 207
 1 Agadeem's Awakening / Agadeem, the Undercrypt (ZNR) 336
@@ -120,7 +121,7 @@ Para cartas custom (MTGBuilder, proxies, arte alternativa):
 ## API
 
 | Método | Endpoint | Descrição |
-|---|---|---|
+| --- | --- | --- |
 | `GET` | `/api/search?q=<query>` | Busca no Scryfall |
 | `GET` | `/api/card-by-set/<set>/<number>` | Busca carta exata |
 | `POST` | `/api/upload` | Upload de imagem local |
@@ -133,8 +134,8 @@ Para cartas custom (MTGBuilder, proxies, arte alternativa):
 
 ## Estrutura
 
-```
-card-print-studio/
+```text
+mtg-craft/
 ├── app.py               # Backend Flask
 ├── generate.py          # Motor de geração de PDF (PyMuPDF)
 ├── requirements.txt

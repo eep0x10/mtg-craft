@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Card Print Studio</title>
+<title>MTG Craft</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -698,6 +698,88 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — MOBILE
+═══════════════════════════════════════════════════════════════ */
+
+/* Bottom navigation (mobile only, hidden on desktop) */
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  html, body { overflow: auto; height: auto; }
+
+  /* Header compact */
+  header { padding: 0 12px; height: 48px; gap: 10px; }
+  .hdr-sub, .hdr-pill { display: none; }
+  .hdr-title { font-size: 14px; letter-spacing: 1px; }
+  .hdr-rune  { width: 26px; height: 26px; font-size: 12px; }
+  #hdrStats  { font-size: 11px; }
+
+  /* Layout: single column, panels stacked, only active visible */
+  .layout {
+    grid-template-columns: 1fr;
+    overflow: visible;
+    padding-bottom: 56px; /* room for bottom nav */
+  }
+
+  .panel {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    display: none;          /* hidden by default */
+    min-height: calc(100dvh - 48px - 56px);
+  }
+  .panel.active-panel { display: flex; }
+
+  /* Preview panel: allow shorter on mobile */
+  .panel:last-child { min-height: auto; padding-bottom: 16px; }
+
+  /* Bottom nav */
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 56px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+  }
+  .mnav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    letter-spacing: .3px;
+    transition: color .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mnav-btn .mnav-icon { font-size: 20px; }
+  .mnav-btn.active { color: var(--gold); }
+  .mnav-btn.active .mnav-icon { filter: drop-shadow(0 0 6px rgba(201,168,76,.6)); }
+
+  /* Deck footer: compact on mobile */
+  .deck-footer { padding: 10px 12px; gap: 8px; }
+  .stat-val { font-size: 15px; }
+
+  /* Preview: smaller scale */
+  .panel-body.preview-bg { padding: 10px 8px; --scale: 0.34; }
+
+  /* Tabs: fit 4 tabs */
+  .tab { padding: 5px 2px; font-size: 10px; }
+
+  /* Input area height */
+  #importArea { height: 100px; }
+}
+
 /* ─── Section divider ───────────────────────────────────────── */
 .divider {
   display: flex;
@@ -788,7 +870,7 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
   <div class="hdr-logo">
     <div class="hdr-rune">✦</div>
     <div>
-      <div class="hdr-title">Card Print Studio</div>
+      <div class="hdr-title">MTG Craft</div>
       <div class="hdr-sub">Alta Resolução · Scryfall PNG · A4 3×3</div>
     </div>
   </div>
@@ -836,9 +918,23 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 4 Forest (PIP) 325
 1 Agadeem's Awakening / Agadeem, the Undercrypt (ZNR) 336
 4 Lightning Bolt"></textarea>
-      <button class="btn" id="importBtn" style="width:100%">✦ Importar Lista</button>
 
-      <div class="divider" style="margin-top:14px">ou import por URL</div>
+      <!-- Ação da importação -->
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <button class="btn" id="importBtn" style="flex:1;min-width:120px">→ Deck atual</button>
+        <button class="btn btn-ghost btn-sm" id="importSaveNewBtn" style="flex:1;min-width:120px">💾 Novo deck…</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <select id="mergeTargetSelect" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text2);padding:7px 10px;font-size:12px;font-family:Inter,sans-serif;outline:none">
+          <option value="">Mesclar em deck salvo…</option>
+        </select>
+        <button class="btn btn-sm" id="importMergeBtn" style="flex:0 0 auto">Mesclar</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="replaceMode" style="width:auto;accent-color:var(--gold)"> Substituir duplicatas (usa qty da lista, não soma)
+      </label>
+
+      <div class="divider">ou import por URL</div>
       <div class="url-row">
         <input type="text" id="deckUrlInput" placeholder="Moxfield / Archidekt URL…">
         <button class="btn btn-sm" id="deckUrlBtn">↓</button>
@@ -937,6 +1033,19 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 </div>
 
 </div><!-- /layout -->
+
+<!-- Mobile bottom navigation -->
+<nav class="mobile-nav" id="mobileNav">
+  <button class="mnav-btn active" data-panel="0">
+    <span class="mnav-icon">🔍</span>Buscar
+  </button>
+  <button class="mnav-btn" data-panel="1">
+    <span class="mnav-icon">📋</span>Deck
+  </button>
+  <button class="mnav-btn" data-panel="2">
+    <span class="mnav-icon">👁</span>Preview
+  </button>
+</nav>
 
 <div class="toast hide" id="toast"></div>
 
@@ -1045,14 +1154,17 @@ async function doSearch() {
 const RE_FULL = /^(\d+)x?\s+(.*?)\s+\(([A-Z0-9a-z]+)\)\s+(\S+)$/;
 const RE_NAME = /^(\d+)x?\s+(.+)$/i;
 
-document.getElementById('importBtn').addEventListener('click', async () => {
-  const text = document.getElementById('importArea').value.trim();
-  if (!text) return;
-  const log  = document.getElementById('importLog');
-  const btn  = document.getElementById('importBtn');
+/**
+ * Resolve all lines in the import textarea to card objects.
+ * Returns { resolved: [{card, qty}], ok, fail }
+ * Logs progress to importLog.
+ */
+async function resolveImportLines(log) {
+  const text  = document.getElementById('importArea').value.trim();
+  if (!text) return null;
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   log.innerHTML = '';
-  btn.disabled = true;
+  const resolved = [];
   let ok = 0, fail = 0;
 
   for (const line of lines) {
@@ -1087,7 +1199,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     try {
       const results = await fetchFn();
       if (results.length && results[0].png) {
-        addCard(results[0], qty);
+        resolved.push({ card: results[0], qty });
         log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name} · ${(results[0].set_code||'').toUpperCase()}</div>`;
         ok++;
       } else {
@@ -1101,10 +1213,115 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     log.scrollTop = log.scrollHeight;
     await new Promise(r => setTimeout(r, 120));
   }
+  return { resolved, ok, fail };
+}
+
+/**
+ * Apply a resolved card list to a target deck array.
+ * replace=true → set qty (not add) for existing cards.
+ */
+function applyResolved(targetDeck, resolved, replace) {
+  for (const { card, qty } of resolved) {
+    const idx = targetDeck.findIndex(d => d.id === card.id);
+    if (idx >= 0) {
+      targetDeck[idx].qty = replace ? qty : Math.min(20, targetDeck[idx].qty + qty);
+    } else {
+      targetDeck.push({ ...card, qty });
+    }
+  }
+}
+
+// ── Botão "→ Deck atual" ──────────────────────────────────────
+document.getElementById('importBtn').addEventListener('click', async () => {
+  const log = document.getElementById('importLog');
+  const btn = document.getElementById('importBtn');
+  btn.disabled = true;
+  const replace = document.getElementById('replaceMode').checked;
+
+  const result = await resolveImportLines(log);
+  if (!result) { btn.disabled = false; return; }
+  const { resolved, ok, fail } = result;
+
+  applyResolved(deck, resolved, replace);
+  renderDeck();
+  renderPreview();
+
   log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ Concluído: ${ok} OK · ${fail} falha(s)</div>`;
   log.scrollTop = log.scrollHeight;
   btn.disabled = false;
-  btn.innerHTML = '✦ Importar Lista';
+});
+
+// ── Botão "💾 Novo deck…" ─────────────────────────────────────
+document.getElementById('importSaveNewBtn').addEventListener('click', async () => {
+  const name = prompt('Nome para o novo deck:');
+  if (!name || !name.trim()) return;
+  const log = document.getElementById('importLog');
+  const btn = document.getElementById('importSaveNewBtn');
+  btn.disabled = true;
+
+  const result = await resolveImportLines(log);
+  if (!result) { btn.disabled = false; return; }
+  const { resolved, ok, fail } = result;
+
+  const newDeck = [];
+  applyResolved(newDeck, resolved, true); // sempre replace num deck novo
+
+  const saved = loadSavedDecks();
+  saved.push({
+    name: name.trim(),
+    savedAt: Date.now(),
+    totalCards: newDeck.reduce((s,c) => s+c.qty, 0),
+    cards: newDeck,
+  });
+  persistDecks(saved);
+  renderSavedDecks();
+
+  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ Deck "${name.trim()}" salvo: ${ok} OK · ${fail} falha(s)</div>`;
+  log.scrollTop = log.scrollHeight;
+  btn.disabled = false;
+  toast(`Deck "${name.trim()}" salvo!`, 'ok');
+});
+
+// ── Botão "Mesclar" em deck salvo ──────────────────────────────
+document.getElementById('importMergeBtn').addEventListener('click', async () => {
+  const targetName = document.getElementById('mergeTargetSelect').value;
+  if (!targetName) { toast('Selecione um deck para mesclar', 'err'); return; }
+  const log = document.getElementById('importLog');
+  const btn = document.getElementById('importMergeBtn');
+  btn.disabled = true;
+  const replace = document.getElementById('replaceMode').checked;
+
+  const result = await resolveImportLines(log);
+  if (!result) { btn.disabled = false; return; }
+  const { resolved, ok, fail } = result;
+
+  const saved  = loadSavedDecks();
+  const entry  = saved.find(d => d.name === targetName);
+  if (!entry) { toast('Deck não encontrado', 'err'); btn.disabled = false; return; }
+
+  applyResolved(entry.cards, resolved, replace);
+  entry.totalCards = entry.cards.reduce((s,c) => s+c.qty, 0);
+  entry.savedAt = Date.now();
+  persistDecks(saved);
+  renderSavedDecks();
+
+  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ Mesclado em "${targetName}": ${ok} OK · ${fail} falha(s)</div>`;
+  log.scrollTop = log.scrollHeight;
+  btn.disabled = false;
+  toast(`Lista mesclada em "${targetName}"`, 'ok');
+});
+
+// Popula o select de decks salvos quando a aba Lista é aberta
+function refreshMergeSelect() {
+  const sel   = document.getElementById('mergeTargetSelect');
+  const saved = loadSavedDecks();
+  sel.innerHTML = '<option value="">Mesclar em deck salvo…</option>' +
+    saved.map(d => `<option value="${d.name.replace(/"/g,'&quot;')}">${d.name} (${d.totalCards} cartas)</option>`).join('');
+}
+document.querySelectorAll('#inputTabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    if (tab.dataset.tab === 'import') refreshMergeSelect();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -1162,6 +1379,8 @@ function addCard(card, qty = 1) {
   renderDeck();
   renderPreview();
   toast(`${card.name} adicionada`, 'ok');
+  // Mobile: switch to deck panel after adding a card
+  if (typeof isMobile === 'function' && isMobile()) switchMobilePanel(1);
 }
 
 function removeCard(idx) {
@@ -1322,6 +1541,36 @@ async function generatePDF() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Mobile panel navigation
+// ═══════════════════════════════════════════════════════════════
+const panels = document.querySelectorAll('.layout .panel');
+
+function isMobile() { return window.innerWidth <= 767; }
+
+function initMobilePanels() {
+  if (!isMobile()) {
+    // Desktop: all panels visible
+    panels.forEach(p => { p.classList.add('active-panel'); p.style.display = ''; });
+    return;
+  }
+  // Mobile: only first panel active
+  panels.forEach((p, i) => p.classList.toggle('active-panel', i === 0));
+}
+
+function switchMobilePanel(idx) {
+  panels.forEach((p, i) => p.classList.toggle('active-panel', i === idx));
+  document.querySelectorAll('.mnav-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+  window.scrollTo(0, 0);
+}
+
+document.querySelectorAll('.mnav-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchMobilePanel(+btn.dataset.panel));
+});
+
+window.addEventListener('resize', initMobilePanels);
+initMobilePanels();
+
+// ═══════════════════════════════════════════════════════════════
 // Limpar deck
 // ═══════════════════════════════════════════════════════════════
 document.getElementById('clearBtn').addEventListener('click', () => {
@@ -1335,7 +1584,7 @@ document.getElementById('clearBtn').addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════════════
 // Decks salvos (localStorage)
 // ═══════════════════════════════════════════════════════════════
-const STORAGE_KEY = 'cps_saved_decks';
+const STORAGE_KEY = 'mtgcraft_saved_decks';
 
 function loadSavedDecks() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
@@ -1381,6 +1630,7 @@ function loadSavedDeck(name) {
 }
 
 function renderSavedDecks() {
+  refreshMergeSelect();
   const saved = loadSavedDecks();
   const el = document.getElementById('savedDecksList');
   if (!saved.length) {

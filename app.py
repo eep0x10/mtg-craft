@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Card PDF Web App — Backend Flask
+MTG Craft — Backend Flask
 Porta: 5001
 
 Endpoints:
@@ -380,6 +380,6 @@ def proxy_image():
 
 
 if __name__ == "__main__":
-    print("Card PDF Gen rodando em http://localhost:5001")
+    print("MTG Craft rodando em http://localhost:5001")
     # use_reloader=False evita problema de SSL no child process do Werkzeug reloader (WSL2)
     app.run(host="0.0.0.0", port=5001, debug=True, use_reloader=False)
