@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Print Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   RESET & TOKENS
+═══════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Palette */
+  --bg:        #07060d;
+  --surface:   #0f0e1a;
+  --surface2:  #161426;
+  --surface3:  #1e1b32;
+  --border:    #2a2645;
+  --border2:   #3a3560;
+
+  /* Gold — primary accent */
+  --gold:      #c9a84c;
+  --gold2:     #a07c2e;
+  --gold3:     #e8c870;
+  --gold-glow: rgba(201,168,76,.15);
+  --gold-glow2:rgba(201,168,76,.08);
+
+  /* Purple — secondary accent (DFC, magic) */
+  --purple:    #7c3aed;
+  --purple2:   #5b2dc0;
+  --purple-lt: #a875ff;
+
+  /* Semantic */
+  --text:      #e8dfc8;
+  --text2:     #b0a898;
+  --muted:     #6b6070;
+  --danger:    #c94444;
+  --success:   #3a9f5e;
+  --warn:      #c9943a;
+
+  /* Sheet */
+  --scale: 0.403;
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+
+  /* Subtle noise texture */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(124,58,237,.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(201,168,76,.04) 0%, transparent 60%);
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
+
+/* ═══════════════════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════════════════ */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  height: 56px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* decorative arcane line at bottom of header */
+header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold) 30%, var(--gold3) 50%, var(--gold) 70%, transparent);
+  opacity: .6;
+}
+
+.hdr-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hdr-rune {
+  width: 32px; height: 32px;
+  border: 1.5px solid var(--gold);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  color: var(--gold);
+  box-shadow: 0 0 10px var(--gold-glow), inset 0 0 8px var(--gold-glow2);
+  flex-shrink: 0;
+}
+.hdr-title {
+  font-family: 'Cinzel', serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 1.5px;
+  text-shadow: 0 0 20px var(--gold-glow);
+}
+.hdr-sub {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+.hdr-pill {
+  font-size: 11px;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 3px 12px;
+  background: var(--surface2);
+  letter-spacing: .3px;
+}
+#hdrStats {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════════════════════════ */
+.layout {
+  display: grid;
+  grid-template-columns: 310px 1fr 290px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+.panel:last-child { border-right: none; }
+
+.panel-header {
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+.panel-header::before {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 16px; right: 16px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--gold2), transparent);
+  opacity: .5;
+}
+.panel-title {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.panel-icon {
+  font-size: 13px;
+  opacity: .8;
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INPUTS
+═══════════════════════════════════════════════════════════════ */
+input[type="text"], textarea {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  width: 100%;
+}
+input[type="text"]:focus, textarea:focus {
+  border-color: var(--gold2);
+  box-shadow: 0 0 0 3px var(--gold-glow2);
+}
+input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
+
+/* ─── Search bar ────────────────────────────────────────────── */
+.search-wrap {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════════════════════════════ */
+.btn {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
+  color: #1a1000;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .8px;
+  transition: filter .15s, transform .1s, box-shadow .15s;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(201,168,76,.2);
+}
+.btn:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 4px 16px rgba(201,168,76,.35);
+}
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .5; cursor: not-allowed; filter: none; }
+
+.btn-sm { padding: 6px 12px; font-size: 11px; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+  box-shadow: none;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0;
+}
+.btn-ghost:hover {
+  border-color: var(--gold2);
+  color: var(--gold);
+  background: var(--gold-glow2);
+  box-shadow: none;
+  filter: none;
+}
+
+.btn-gen {
+  background: linear-gradient(135deg, #2d7a4f 0%, #1a5c35 100%);
+  color: #c8ffd8;
+  font-size: 13px;
+  letter-spacing: 1px;
+  padding: 11px 20px;
+  box-shadow: 0 2px 12px rgba(42,160,90,.25);
+}
+.btn-gen:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 4px 20px rgba(42,160,90,.4);
+}
+.btn-gen:disabled { opacity: .5; cursor: not-allowed; filter: none; box-shadow: none; }
+
+/* ═══════════════════════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════════════════════ */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+}
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 6px 4px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all .2s;
+  letter-spacing: .3px;
+}
+.tab.active {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
+  color: #1a1000;
+}
+.tab:not(.active):hover { color: var(--text2); background: var(--surface3); }
+
+/* ═══════════════════════════════════════════════════════════════
+   SEARCH RESULTS
+═══════════════════════════════════════════════════════════════ */
+#searchResults { display: flex; flex-direction: column; gap: 4px; }
+
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+  border: 1px solid transparent;
+}
+.search-result:hover {
+  background: var(--surface3);
+  border-color: var(--border2);
+}
+.search-result img {
+  width: 38px;
+  height: 53px;
+  object-fit: cover;
+  border-radius: 5px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,.5);
+}
+.sr-info { flex: 1; min-width: 0; }
+.sr-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sr-set {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.sr-add {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+  color: #1a1000;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity .15s, transform .15s;
+  transform: scale(.8);
+}
+.search-result:hover .sr-add { opacity: 1; transform: scale(1); }
+
+/* ═══════════════════════════════════════════════════════════════
+   UPLOAD ZONE
+═══════════════════════════════════════════════════════════════ */
+.upload-zone {
+  border: 2px dashed var(--border2);
+  border-radius: 12px;
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 12px;
+  background: var(--surface2);
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--gold2);
+  background: var(--gold-glow2);
+  color: var(--text);
+}
+.upload-zone .uz-icon { font-size: 28px; margin-bottom: 8px; display: block; }
+.upload-zone input { display: none; }
+
+/* ─── Import area ───────────────────────────────────────────── */
+#importArea {
+  height: 130px;
+  resize: vertical;
+  margin-bottom: 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DECK LIST
+═══════════════════════════════════════════════════════════════ */
+#deckList { display: flex; flex-direction: column; gap: 5px; }
+
+.deck-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 7px 9px;
+  transition: border-color .15s;
+  position: relative;
+  overflow: hidden;
+}
+.deck-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--gold3), var(--gold2));
+  border-radius: 9px 0 0 9px;
+}
+.deck-item.is-dfc::before {
+  background: linear-gradient(180deg, var(--purple-lt), var(--purple2));
+}
+.deck-item:hover { border-color: var(--border2); }
+
+.deck-item img {
+  width: 32px; height: 45px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 5px rgba(0,0,0,.5);
+}
+.di-info { flex: 1; min-width: 0; }
+.di-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.di-set {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.dfc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: linear-gradient(135deg, var(--purple) 0%, var(--purple2) 100%);
+  color: #e0d8ff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: .4px;
+  vertical-align: middle;
+  margin-left: 5px;
+}
+
+/* Qty control */
+.qty-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+.qty-btn {
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color .1s, background .1s;
+  line-height: 1;
+}
+.qty-btn:hover { color: var(--gold); background: var(--gold-glow2); }
+.qty-val {
+  min-width: 18px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gold);
+}
+.rm-btn {
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .12s;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+.rm-btn:hover { background: var(--danger); color: #fff; border-radius: 4px; }
+
+/* ─── Deck footer ───────────────────────────────────────────── */
+.deck-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.deck-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.stat-pill {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  text-align: center;
+}
+.stat-val {
+  font-family: 'Cinzel', serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+  display: block;
+}
+.stat-lbl {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  margin-top: 3px;
+  display: block;
+}
+.footer-btns { display: flex; gap: 8px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   PREVIEW PANEL
+═══════════════════════════════════════════════════════════════ */
+.preview-bg {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 50%, rgba(10,8,20,1) 0%, var(--bg) 100%);
+  padding: 16px 14px;
+}
+
+#preview {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+/* A4 sheet — proporções exatas do PDF */
+.sheet-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.sheet {
+  width:  calc(595.28 * var(--scale) * 1px);
+  height: calc(841.89 * var(--scale) * 1px);
+  background: #f8f5ef;
+  border-radius: 3px;
+  box-shadow:
+    0 0 0 1px rgba(201,168,76,.3),
+    0 8px 32px rgba(0,0,0,.7),
+    0 2px 4px rgba(0,0,0,.5);
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.sheet-label {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .5px;
+  text-align: center;
+}
+.sheet-logo {
+  position: absolute;
+  left:   calc(208.35 * var(--scale) * 1px);
+  top:    calc(14.17  * var(--scale) * 1px);
+  width:  calc(178.58 * var(--scale) * 1px);
+  height: calc(30.24  * var(--scale) * 1px);
+  object-fit: contain;
+}
+.card-slot {
+  position: absolute;
+  overflow: hidden;
+  border-radius: 1px;
+}
+.card-slot img {
+  width: 100%; height: 100%;
+  object-fit: fill;
+  display: block;
+}
+.card-slot.empty {
+  background: #ede8df;
+  border: 1px dashed #ccc4b0;
+}
+.cut-h { position: absolute; left: 0; right: 0; height: 0.5px; background: rgba(0,0,0,.2); pointer-events: none; }
+.cut-v { position: absolute; width: 0.5px; background: rgba(0,0,0,.2); pointer-events: none; }
+
+/* ═══════════════════════════════════════════════════════════════
+   IMPORT LOG
+═══════════════════════════════════════════════════════════════ */
+#importLog {
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text2);
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: none;
+}
+#importLog:not(:empty) { display: block; }
+
+/* ═══════════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════════ */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 10px 22px;
+  font-size: 13px;
+  z-index: 999;
+  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  transition: opacity .25s, transform .25s;
+  white-space: nowrap;
+}
+.toast.hide { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(8px); }
+.toast.err  { border-color: var(--danger); color: #ff8080; }
+.toast.ok   { border-color: var(--gold2); color: var(--gold3); }
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPTY STATE
+═══════════════════════════════════════════════════════════════ */
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+  padding: 36px 16px;
+  font-size: 13px;
+  line-height: 2;
+}
+.empty-state .es-icon {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 8px;
+  opacity: .5;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SPINNER
+═══════════════════════════════════════════════════════════════ */
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(201,168,76,.2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Section divider ───────────────────────────────────────── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 10px 0 8px;
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2), transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SAVED DECKS
+═══════════════════════════════════════════════════════════════ */
+.saved-deck-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  transition: border-color .15s;
+  cursor: pointer;
+}
+.saved-deck-item:hover { border-color: var(--gold2); background: var(--surface3); }
+.sdi-icon { font-size: 18px; flex-shrink: 0; }
+.sdi-info { flex: 1; min-width: 0; }
+.sdi-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sdi-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.sdi-load {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
+  color: #1a1000;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: .5px;
+}
+.sdi-del {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.sdi-del:hover { background: var(--danger); color: #fff; }
+
+/* ─── URL import row ─────────────────────────────────────────── */
+.url-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.url-row input { flex: 1; }
+
+/* ─── Custom image URL section ───────────────────────────────── */
+.img-url-row { display: flex; gap: 6px; margin-top: 12px; }
+.img-url-row input { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════ HEADER ════════════════════════════ -->
+<header>
+  <div class="hdr-logo">
+    <div class="hdr-rune">✦</div>
+    <div>
+      <div class="hdr-title">Card Print Studio</div>
+      <div class="hdr-sub">Alta Resolução · Scryfall PNG · A4 3×3</div>
+    </div>
+  </div>
+  <div class="hdr-pill">63 × 88 mm</div>
+  <div class="hdr-pill">300 DPI</div>
+  <span id="hdrStats"></span>
+</header>
+
+<div class="layout">
+
+<!-- ════════════════════════ PAINEL 1: BUSCA ══════════════════ -->
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-icon">🔍</span>
+    <span class="panel-title">Adicionar Cartas</span>
+  </div>
+  <div class="panel-body">
+
+    <div class="tabs" id="inputTabs">
+      <div class="tab active" data-tab="search">Scryfall</div>
+      <div class="tab" data-tab="import">Lista</div>
+      <div class="tab" data-tab="upload">Upload</div>
+      <div class="tab" data-tab="decks">Decks</div>
+    </div>
+
+    <!-- Tab: Search -->
+    <div id="tabSearch">
+      <div class="search-wrap">
+        <input type="text" id="searchInput" placeholder="Nome da carta em inglês…" autocomplete="off">
+        <button class="btn btn-sm" id="searchBtn">Buscar</button>
+      </div>
+      <div id="searchResults">
+        <div class="empty-state">
+          <span class="es-icon">🃏</span>
+          Digite o nome de uma carta para buscar no Scryfall
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Import list -->
+    <div id="tabImport" style="display:none">
+      <textarea id="importArea" placeholder="Cole a lista — formatos aceitos:
+1 The Wise Mothman (SLD) 2455
+1 Aberrant (40K) 86★
+4 Forest (PIP) 325
+1 Agadeem's Awakening / Agadeem, the Undercrypt (ZNR) 336
+4 Lightning Bolt"></textarea>
+      <button class="btn" id="importBtn" style="width:100%">✦ Importar Lista</button>
+
+      <div class="divider" style="margin-top:14px">ou import por URL</div>
+      <div class="url-row">
+        <input type="text" id="deckUrlInput" placeholder="Moxfield / Archidekt URL…">
+        <button class="btn btn-sm" id="deckUrlBtn">↓</button>
+      </div>
+
+      <div id="importLog"></div>
+    </div>
+
+    <!-- Tab: Upload -->
+    <div id="tabUpload" style="display:none">
+      <div class="upload-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp" multiple>
+        <span class="uz-icon">📂</span>
+        <div style="font-weight:600;color:var(--text2);margin-bottom:4px">Arraste imagens aqui</div>
+        <div style="font-size:11px">JPG · PNG · WEBP</div>
+      </div>
+      <div id="uploadList"></div>
+
+      <div class="divider" style="margin-top:4px">ou URL de imagem</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+        MTGBuilder, proxies, qualquer imagem pública
+      </div>
+      <input type="text" id="imgUrlInput" placeholder="https://… (URL da imagem da carta)" style="margin-bottom:6px">
+      <input type="text" id="imgUrlName" placeholder="Nome da carta (opcional)" style="margin-bottom:6px">
+      <button class="btn" id="imgUrlBtn" style="width:100%">↓ Adicionar Imagem</button>
+    </div>
+
+    <!-- Tab: Saved decks -->
+    <div id="tabDecks" style="display:none">
+      <div class="url-row" style="margin-bottom:12px">
+        <input type="text" id="saveDeckName" placeholder="Nome do deck…">
+        <button class="btn btn-sm" id="saveDeckBtn">💾 Salvar</button>
+      </div>
+      <div id="savedDecksList">
+        <div class="empty-state">
+          <span class="es-icon">📚</span>
+          Nenhum deck salvo.<br>
+          Monte um deck e salve com um nome.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════ PAINEL 2: DECK ═══════════════════ -->
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-icon">📋</span>
+    <span class="panel-title">Lista do Deck</span>
+  </div>
+  <div class="panel-body" style="padding: 12px 14px">
+    <div id="deckList">
+      <div class="empty-state">
+        <span class="es-icon">⚗️</span>
+        Nenhuma carta adicionada.<br>
+        Busque no Scryfall, importe uma lista<br>ou faça upload de imagens.
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <div class="deck-stats">
+      <div class="stat-pill">
+        <span class="stat-val" id="totalCards">0</span>
+        <span class="stat-lbl">Cartas</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-val" id="totalPages">0</span>
+        <span class="stat-lbl">Páginas</span>
+      </div>
+    </div>
+    <div class="footer-btns">
+      <button class="btn btn-ghost btn-sm" id="clearBtn" style="flex:1">Limpar</button>
+      <button class="btn btn-ghost btn-sm" id="quickSaveBtn" title="Salvar deck rapidamente" style="flex:0 0 auto; padding: 6px 10px">💾</button>
+      <button class="btn btn-gen" id="genBtn" style="flex:2">
+        ⬇ Gerar PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════ PAINEL 3: PREVIEW ════════════════ -->
+<div class="panel" style="border-right:none">
+  <div class="panel-header">
+    <span class="panel-icon">👁</span>
+    <span class="panel-title">Preview</span>
+  </div>
+  <div class="panel-body preview-bg">
+    <div id="preview">
+      <div class="empty-state">
+        <span class="es-icon">🖨️</span>
+        O preview das folhas aparece aqui conforme você adiciona cartas
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /layout -->
+
+<div class="toast hide" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Estado global
+// ═══════════════════════════════════════════════════════════════
+let deck = [];
+
+const PDF = {
+  W: 595.28, H: 841.89,
+  COLS_X: [29.76, 208.35, 386.93, 565.51],
+  ROWS_Y: [58.58, 308.03, 557.48, 806.93],
+  CARDS_PER_PAGE: 9,
+};
+const SCALE = 0.403;
+const pt = v => `${(v * SCALE).toFixed(2)}px`;
+
+function cardSlots() {
+  const slots = [];
+  for (let ri = 0; ri < 3; ri++)
+    for (let ci = 0; ci < 3; ci++)
+      slots.push({
+        x: PDF.COLS_X[ci], y: PDF.ROWS_Y[ri],
+        w: PDF.COLS_X[ci+1] - PDF.COLS_X[ci],
+        h: PDF.ROWS_Y[ri+1] - PDF.ROWS_Y[ri],
+      });
+  return slots;
+}
+const SLOTS = cardSlots();
+
+// ═══════════════════════════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════════════════════════
+let _toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.className = 'toast hide', 3500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tabs
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll('#inputTabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#inputTabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    ['tabSearch','tabImport','tabUpload','tabDecks'].forEach(id =>
+      document.getElementById(id).style.display = 'none');
+    document.getElementById('tab' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1)).style.display = '';
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Search
+// ═══════════════════════════════════════════════════════════════
+let _searchTimer;
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('input', () => {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => doSearch(), 400);
+});
+searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('searchBtn').addEventListener('click', doSearch);
+
+async function doSearch() {
+  const q = searchInput.value.trim();
+  if (!q) return;
+  const el = document.getElementById('searchResults');
+  el.innerHTML = '<div class="empty-state"><span class="spinner"></span>Consultando Scryfall…</div>';
+  try {
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await r.json();
+    if (!r.ok) {
+      el.innerHTML = `<div class="empty-state" style="color:var(--danger)">${data.error || 'Erro no Scryfall'}</div>`;
+      return;
+    }
+    if (!data.length) {
+      el.innerHTML = '<div class="empty-state"><span class="es-icon">😶</span>Nenhuma carta encontrada</div>';
+      return;
+    }
+    el.innerHTML = data.map(c => `
+      <div class="search-result" data-id="${c.id}">
+        <img src="${c.thumb}" alt="${c.name}" loading="lazy" onerror="this.style.background='#222'">
+        <div class="sr-info">
+          <div class="sr-name">${c.name}${c.is_dfc ? ' <span class="dfc-badge">F/V</span>' : ''}</div>
+          <div class="sr-set">${c.set_name} · ${(c.set_code||'').toUpperCase()} #${c.collector_number||'?'}</div>
+        </div>
+        <div class="sr-add">+</div>
+      </div>
+    `).join('');
+    el.querySelectorAll('.search-result').forEach((row, i) => {
+      row.addEventListener('click', () => addCard(data[i]));
+    });
+  } catch {
+    el.innerHTML = `<div class="empty-state" style="color:var(--danger)">Erro de conexão com o servidor</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Import lista
+// ═══════════════════════════════════════════════════════════════
+const RE_FULL = /^(\d+)x?\s+(.*?)\s+\(([A-Z0-9a-z]+)\)\s+(\S+)$/;
+const RE_NAME = /^(\d+)x?\s+(.+)$/i;
+
+document.getElementById('importBtn').addEventListener('click', async () => {
+  const text = document.getElementById('importArea').value.trim();
+  if (!text) return;
+  const log  = document.getElementById('importLog');
+  const btn  = document.getElementById('importBtn');
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  log.innerHTML = '';
+  btn.disabled = true;
+  let ok = 0, fail = 0;
+
+  for (const line of lines) {
+    const mFull = line.match(RE_FULL);
+    const mName = !mFull && line.match(RE_NAME);
+    let qty, displayName, fetchFn;
+
+    if (mFull) {
+      qty = parseInt(mFull[1]) || 1;
+      const name = mFull[2].trim(), set = mFull[3].toUpperCase(), num = mFull[4];
+      displayName = `${name} (${set}) ${num}`;
+      fetchFn = async () => {
+        const r = await fetch(`/api/card-by-set/${encodeURIComponent(set)}/${encodeURIComponent(num)}`);
+        const d = await r.json();
+        return r.ok ? [d] : [];
+      };
+    } else if (mName) {
+      qty = parseInt(mName[1]) || 1;
+      displayName = mName[2].trim();
+      fetchFn = async () => {
+        const r = await fetch(`/api/search?q=!"${encodeURIComponent(displayName)}"`);
+        const d = await r.json();
+        return Array.isArray(d) ? d : [];
+      };
+    } else {
+      log.innerHTML += `<div style="color:var(--muted)">— ${line}</div>`;
+      continue;
+    }
+
+    log.innerHTML += `<div style="color:var(--text2)">🔍 ${displayName}…</div>`;
+    log.scrollTop = log.scrollHeight;
+    try {
+      const results = await fetchFn();
+      if (results.length && results[0].png) {
+        addCard(results[0], qty);
+        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name} · ${(results[0].set_code||'').toUpperCase()}</div>`;
+        ok++;
+      } else {
+        log.innerHTML += `<div style="color:var(--warn)">⚠ Não encontrado: ${displayName}</div>`;
+        fail++;
+      }
+    } catch {
+      log.innerHTML += `<div style="color:var(--danger)">✗ Erro: ${displayName}</div>`;
+      fail++;
+    }
+    log.scrollTop = log.scrollHeight;
+    await new Promise(r => setTimeout(r, 120));
+  }
+  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ Concluído: ${ok} OK · ${fail} falha(s)</div>`;
+  log.scrollTop = log.scrollHeight;
+  btn.disabled = false;
+  btn.innerHTML = '✦ Importar Lista';
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Upload
+// ═══════════════════════════════════════════════════════════════
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  uploadFiles([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change', () => uploadFiles([...fileInput.files]));
+
+async function uploadFiles(files) {
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await fetch('/api/upload', { method: 'POST', body: fd });
+      const data = await r.json();
+      if (!r.ok) { toast(data.error, 'err'); continue; }
+      addCard({
+        id:       data.id,
+        name:     data.name,
+        set_name: 'Upload local',
+        set_code: '',
+        thumb:    data.thumb,
+        png:      '',
+        is_dfc:   false,
+        back_png: '',
+        type:     'upload',
+        path:     data.path,
+      });
+    } catch {
+      toast('Erro no upload: ' + file.name, 'err');
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Deck
+// ═══════════════════════════════════════════════════════════════
+function addCard(card, qty = 1) {
+  const existing = deck.find(d => d.id === card.id);
+  if (existing) {
+    existing.qty = Math.min(20, existing.qty + qty);
+  } else {
+    deck.push({ ...card, qty });
+  }
+  renderDeck();
+  renderPreview();
+  toast(`${card.name} adicionada`, 'ok');
+}
+
+function removeCard(idx) {
+  deck.splice(idx, 1);
+  renderDeck();
+  renderPreview();
+}
+
+function changeQty(idx, delta) {
+  deck[idx].qty = Math.max(1, Math.min(20, deck[idx].qty + delta));
+  renderDeck();
+  renderPreview();
+}
+
+function renderDeck() {
+  const el     = document.getElementById('deckList');
+  const normal = deck.filter(c => !c.is_dfc).reduce((s,c) => s+c.qty, 0);
+  const dfc    = deck.filter(c =>  c.is_dfc).reduce((s,c) => s+c.qty, 0);
+  const total  = normal + dfc;
+  const pages  = Math.ceil(total / 9);
+
+  document.getElementById('totalCards').textContent = total;
+  document.getElementById('totalPages').textContent = pages;
+  document.getElementById('hdrStats').textContent   =
+    total ? `${total} carta${total>1?'s':''} · ${pages} pág.${dfc?' · '+dfc+' F/V':''}` : '';
+
+  if (!deck.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <span class="es-icon">⚗️</span>
+        Nenhuma carta adicionada.<br>
+        Busque no Scryfall, importe uma lista<br>ou faça upload de imagens.
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = deck.map((c, i) => `
+    <div class="deck-item ${c.is_dfc ? 'is-dfc' : ''}">
+      <img src="${c.thumb||''}" alt="${c.name}" onerror="this.style.background='#222'">
+      <div class="di-info">
+        <div class="di-name">
+          ${c.name}
+          ${c.is_dfc ? '<span class="dfc-badge">↕ F/V</span>' : ''}
+        </div>
+        <div class="di-set">${c.set_name || 'Upload'}</div>
+      </div>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="changeQty(${i},-1)">−</button>
+        <span class="qty-val">${c.qty}</span>
+        <button class="qty-btn" onclick="changeQty(${i},+1)">+</button>
+      </div>
+      <button class="rm-btn" onclick="removeCard(${i})" title="Remover">×</button>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Preview — layout EXATO do PDF em HTML
+// ═══════════════════════════════════════════════════════════════
+function renderPreview() {
+  const el = document.getElementById('preview');
+
+  const images = [];
+  for (const c of deck)
+    for (let i = 0; i < c.qty; i++)
+      images.push({ src: c.thumb, dfc: c.is_dfc });
+
+  if (!images.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <span class="es-icon">🖨️</span>
+        O preview das folhas aparece aqui<br>conforme você adiciona cartas
+      </div>`;
+    return;
+  }
+
+  const pages = [];
+  for (let i = 0; i < images.length; i += PDF.CARDS_PER_PAGE)
+    pages.push(images.slice(i, i + PDF.CARDS_PER_PAGE));
+
+  el.innerHTML = pages.map((pageImgs, pi) => {
+    const slotsHtml = SLOTS.map((s, si) => {
+      const img = pageImgs[si];
+      if (img) {
+        return `<div class="card-slot" style="left:${pt(s.x)};top:${pt(s.y)};width:${pt(s.w)};height:${pt(s.h)}">
+          <img src="${img.src}" loading="lazy" onerror="this.style.background='#ddd'">
+        </div>`;
+      }
+      return `<div class="card-slot empty" style="left:${pt(s.x)};top:${pt(s.y)};width:${pt(s.w)};height:${pt(s.h)}"></div>`;
+    }).join('');
+
+    const hLines = PDF.ROWS_Y.map(y =>
+      `<div class="cut-h" style="left:0;right:0;top:${pt(y)}"></div>`).join('');
+    const vLines = PDF.COLS_X.map(x =>
+      `<div class="cut-v" style="top:${pt(PDF.ROWS_Y[0])};bottom:${pt(PDF.H-PDF.ROWS_Y[3])};left:${pt(x)}"></div>`).join('');
+
+    return `
+      <div class="sheet-wrap">
+        <div class="sheet">
+          <img class="sheet-logo" src="/static/logo_cardtrader.png" alt="logo">
+          ${slotsHtml}${hLines}${vLines}
+        </div>
+        <div class="sheet-label">Página ${pi+1} de ${pages.length}</div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Gerar PDF
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('genBtn').addEventListener('click', generatePDF);
+
+async function generatePDF() {
+  if (!deck.length) { toast('Adicione cartas primeiro', 'err'); return; }
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Gerando…';
+
+  const payload = { cards: deck.map(c => ({
+    id:       c.id,
+    name:     c.name,
+    png:      c.png,
+    back_png: c.back_png || '',
+    is_dfc:   c.is_dfc   || false,
+    type:     c.type     || 'scryfall',
+    path:     c.path     || '',
+    qty:      c.qty,
+  }))};
+
+  try {
+    const r = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      toast(err.error || 'Erro ao gerar PDF', 'err');
+      return;
+    }
+    const ct   = r.headers.get('content-type') || '';
+    const isZip = ct.includes('zip');
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {
+      href: url,
+      download: isZip ? 'deck_completo.zip' : 'deck.pdf',
+    });
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(isZip ? '✦ ZIP: deck.pdf + dfc_frente_verso.pdf' : '✦ PDF gerado com sucesso!', 'ok');
+  } catch {
+    toast('Erro de conexão com o servidor', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '⬇ Gerar PDF';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Limpar deck
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (!deck.length) return;
+  deck = [];
+  renderDeck();
+  renderPreview();
+  toast('Deck limpo', '');
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Decks salvos (localStorage)
+// ═══════════════════════════════════════════════════════════════
+const STORAGE_KEY = 'cps_saved_decks';
+
+function loadSavedDecks() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function persistDecks(saved) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+}
+
+function saveDeck(name) {
+  if (!deck.length) { toast('Deck vazio', 'err'); return; }
+  if (!name) { toast('Informe um nome para o deck', 'err'); return; }
+  const saved = loadSavedDecks();
+  const existing = saved.findIndex(d => d.name === name);
+  const entry = {
+    name,
+    savedAt: Date.now(),
+    totalCards: deck.reduce((s,c) => s+c.qty, 0),
+    cards: deck,
+  };
+  if (existing >= 0) saved[existing] = entry;
+  else saved.push(entry);
+  persistDecks(saved);
+  renderSavedDecks();
+  toast(`Deck "${name}" salvo!`, 'ok');
+}
+
+function deleteSavedDeck(name) {
+  const saved = loadSavedDecks().filter(d => d.name !== name);
+  persistDecks(saved);
+  renderSavedDecks();
+  toast(`Deck "${name}" removido`, '');
+}
+
+function loadSavedDeck(name) {
+  const entry = loadSavedDecks().find(d => d.name === name);
+  if (!entry) return;
+  deck = entry.cards.map(c => ({ ...c }));
+  renderDeck();
+  renderPreview();
+  toast(`Deck "${name}" carregado`, 'ok');
+}
+
+function renderSavedDecks() {
+  const saved = loadSavedDecks();
+  const el = document.getElementById('savedDecksList');
+  if (!saved.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <span class="es-icon">📚</span>
+        Nenhum deck salvo.<br>
+        Monte um deck e salve com um nome.
+      </div>`;
+    return;
+  }
+  el.innerHTML = saved.slice().reverse().map(d => `
+    <div class="saved-deck-item" style="margin-bottom:6px">
+      <span class="sdi-icon">🃏</span>
+      <div class="sdi-info">
+        <div class="sdi-name">${d.name}</div>
+        <div class="sdi-meta">${d.totalCards} carta${d.totalCards!==1?'s':''} · ${new Date(d.savedAt).toLocaleDateString('pt-BR')}</div>
+      </div>
+      <button class="sdi-load" onclick="loadSavedDeck(${JSON.stringify(d.name)})">Carregar</button>
+      <button class="sdi-del" onclick="deleteSavedDeck(${JSON.stringify(d.name)})" title="Excluir">×</button>
+    </div>
+  `).join('');
+}
+
+document.getElementById('saveDeckBtn').addEventListener('click', () => {
+  saveDeck(document.getElementById('saveDeckName').value.trim());
+});
+
+document.getElementById('quickSaveBtn').addEventListener('click', () => {
+  const name = prompt('Nome do deck:');
+  if (name && name.trim()) saveDeck(name.trim());
+});
+
+// Render on tab open
+document.querySelectorAll('#inputTabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    if (tab.dataset.tab === 'decks') renderSavedDecks();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Import por URL de deck (Moxfield, Archidekt)
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('deckUrlBtn').addEventListener('click', importDeckByUrl);
+
+async function importDeckByUrl() {
+  const url = document.getElementById('deckUrlInput').value.trim();
+  if (!url) { toast('Cole uma URL de deck', 'err'); return; }
+  const btn = document.getElementById('deckUrlBtn');
+  const log = document.getElementById('importLog');
+  btn.disabled = true;
+  btn.textContent = '…';
+  log.innerHTML = `<div style="color:var(--text2)"><span class="spinner"></span>Baixando deck de ${url.split('/')[2] || 'URL'}…</div>`;
+
+  let deckMeta;
+  try {
+    const r = await fetch('/api/import-deck-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    deckMeta = await r.json();
+    if (!r.ok) { log.innerHTML += `<div style="color:var(--danger)">✗ ${deckMeta.error}</div>`; return; }
+  } catch (e) {
+    log.innerHTML += `<div style="color:var(--danger)">✗ Erro de conexão</div>`;
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↓';
+  }
+
+  const { source, name: deckName, cards } = deckMeta;
+  log.innerHTML += `<div style="color:var(--gold)">✦ ${deckName} (${source}) · ${cards.length} entradas</div>`;
+
+  let ok = 0, fail = 0;
+  for (const entry of cards) {
+    let displayName, fetchFn;
+    if (entry.set && entry.number) {
+      displayName = `${entry.name} (${entry.set}) ${entry.number}`;
+      fetchFn = async () => {
+        const r = await fetch(`/api/card-by-set/${encodeURIComponent(entry.set)}/${encodeURIComponent(entry.number)}`);
+        const d = await r.json();
+        return r.ok ? [d] : [];
+      };
+    } else {
+      displayName = entry.name;
+      fetchFn = async () => {
+        const r = await fetch(`/api/search?q=!"${encodeURIComponent(entry.name)}"`);
+        const d = await r.json();
+        return Array.isArray(d) ? d : [];
+      };
+    }
+
+    log.innerHTML += `<div style="color:var(--text2)">🔍 ${displayName}…</div>`;
+    log.scrollTop = log.scrollHeight;
+    try {
+      const results = await fetchFn();
+      if (results.length && results[0].png) {
+        addCard(results[0], entry.qty || 1);
+        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name}</div>`;
+        ok++;
+      } else {
+        log.innerHTML += `<div style="color:var(--warn)">⚠ ${displayName}</div>`;
+        fail++;
+      }
+    } catch {
+      log.innerHTML += `<div style="color:var(--danger)">✗ Erro: ${displayName}</div>`;
+      fail++;
+    }
+    log.scrollTop = log.scrollHeight;
+    await new Promise(r => setTimeout(r, 120));
+  }
+  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ ${deckName}: ${ok} OK · ${fail} falha(s)</div>`;
+  log.scrollTop = log.scrollHeight;
+  if (deckName) {
+    document.getElementById('saveDeckName').value = deckName;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Import por URL de imagem (MTGBuilder, proxies)
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('imgUrlBtn').addEventListener('click', async () => {
+  const url  = document.getElementById('imgUrlInput').value.trim();
+  const name = document.getElementById('imgUrlName').value.trim() || 'Carta custom';
+  if (!url) { toast('Cole a URL da imagem', 'err'); return; }
+  const btn = document.getElementById('imgUrlBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Baixando…';
+  try {
+    const r = await fetch('/api/proxy-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, name }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast(data.error, 'err'); return; }
+    addCard({
+      id:       data.id,
+      name:     data.name,
+      set_name: 'Custom / URL',
+      set_code: '',
+      thumb:    data.thumb,
+      png:      '',
+      is_dfc:   false,
+      back_png: '',
+      type:     'upload',
+      path:     data.path,
+    });
+    document.getElementById('imgUrlInput').value = '';
+    document.getElementById('imgUrlName').value  = '';
+  } catch {
+    toast('Erro de conexão com o servidor', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '↓ Adicionar Imagem';
+  }
+});
+</script>
+</body>
+</html>
