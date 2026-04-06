@@ -126,26 +126,39 @@ def index():
     return app.send_static_file("index.html")
 
 
+def _build_query(q: str, mode: str) -> str:
+    """Monta a query Scryfall de acordo com o modo de busca."""
+    q = q.strip()
+    if mode == "oracle":
+        return f'o:"{q}"'
+    if mode == "both":
+        # nome contém OU texto contém
+        return f'(name:{q} OR o:"{q}")'
+    # mode == "name" (padrão)
+    return f"({q})"
+
+
 @app.route("/api/search")
 def search():
     q    = request.args.get("q", "").strip()
     lang = request.args.get("lang", "en").strip() or "en"
+    mode = request.args.get("mode", "name").strip()   # name | oracle | both
     if not q:
         return jsonify([])
 
+    base = _build_query(q, mode)
+
     if lang != "en":
-        # Tenta no idioma solicitado primeiro
-        query = f"({q}) lang:{lang}"
+        query = f"{base} lang:{lang}"
         r = scryfall(f"{SCRYFALL}/cards/search", q=query, order="name", unique="cards")
         if r.ok:
             results = r.json().get("data", [])[:20]
             if results:
                 return jsonify([card_data(c) for c in results])
-        # Fallback para inglês se não encontrou resultados
         lang = "en"
 
     # Inglês (padrão ou fallback)
-    query = f"({q}) lang:en"
+    query = f"{base} lang:en"
     r = scryfall(f"{SCRYFALL}/cards/search", q=query, order="name", unique="cards")
     if r.status_code == 404:
         return jsonify([])
@@ -443,7 +456,19 @@ def proxy_image():
         return jsonify({"error": f"Erro ao baixar imagem: {e}"}), 502
 
 
-COCKATRICE_DIR = Path(r"C:\Users\eep0x10\AppData\Local\Cockatrice\Cockatrice\decks")
+# Detecta o diretório de decks do Cockatrice automaticamente
+def _find_cockatrice_dir() -> Path:
+    candidates = [
+        Path.home() / "AppData" / "Local" / "Cockatrice" / "Cockatrice" / "decks",
+        Path.home() / ".local" / "share" / "Cockatrice" / "Cockatrice" / "decks",
+        Path.home() / "Library" / "Application Support" / "Cockatrice" / "decks",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]  # retorna o padrão Windows mesmo se não existir
+
+COCKATRICE_DIR = _find_cockatrice_dir()
 
 
 @app.route("/api/card-info")

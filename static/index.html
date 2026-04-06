@@ -850,6 +850,34 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 }
 .sdi-del:hover { background: var(--danger); color: #fff; }
 
+/* ─── Search mode toggle ────────────────────────────────────── */
+.search-mode {
+  display: flex;
+  gap: 0;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sm-btn {
+  flex: 1;
+  padding: 5px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  background: var(--surface2);
+  color: var(--muted);
+  border: none;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+}
+.sm-btn:last-child { border-right: none; }
+.sm-btn.active { background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%); color: #1a1000; }
+.sm-btn:not(.active):hover { background: var(--surface3); color: var(--text2); }
+
 /* ═══════════════════════════════════════════════════════════════
    COCKATRICE
 ═══════════════════════════════════════════════════════════════ */
@@ -1129,8 +1157,13 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 
     <!-- Tab: Search -->
     <div id="tabSearch">
+      <div class="search-mode" id="searchModeToggle">
+        <button class="sm-btn active" data-mode="name">Nome</button>
+        <button class="sm-btn" data-mode="oracle">Texto</button>
+        <button class="sm-btn" data-mode="both">Ambos</button>
+      </div>
       <div class="search-wrap">
-        <input type="text" id="searchInput" placeholder="Nome da carta em inglês…" autocomplete="off">
+        <input type="text" id="searchInput" placeholder="Nome da carta…" autocomplete="off">
         <button class="btn btn-sm" id="searchBtn">Buscar</button>
       </div>
       <div id="searchResults">
@@ -1336,6 +1369,7 @@ const SCALE = 0.403;
 const pt = v => `${(v * SCALE).toFixed(2)}px`;
 
 let activeLang = 'en';
+let activeSearchMode = 'name';
 
 function cardCategory(typeStr) {
   const t = (typeStr || '').toLowerCase();
@@ -1387,6 +1421,19 @@ document.querySelectorAll('#inputTabs .tab').forEach(tab => {
   });
 });
 
+// Search mode toggle
+document.querySelectorAll('#searchModeToggle .sm-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#searchModeToggle .sm-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeSearchMode = btn.dataset.mode;
+    const placeholders = { name: 'Nome da carta…', oracle: 'Texto da carta (ex: Deathtouch)…', both: 'Nome ou texto…' };
+    document.getElementById('searchInput').placeholder = placeholders[activeSearchMode];
+    // Re-busca se já tinha algo
+    if (document.getElementById('searchInput').value.trim()) doSearch();
+  });
+});
+
 document.getElementById('langSelect').addEventListener('change', e => {
   activeLang = e.target.value;
   const names = {en:'English',pt:'Português',fr:'Français',de:'Deutsch',es:'Español',it:'Italiano',ja:'日本語',ko:'한국어',ru:'Русский',zhs:'简体中文',zht:'繁體中文'};
@@ -1412,7 +1459,7 @@ async function doSearch() {
   const el = document.getElementById('searchResults');
   el.innerHTML = '<div class="empty-state"><span class="spinner"></span>Consultando Scryfall…</div>';
   try {
-    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&lang=${activeLang}`);
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&lang=${activeLang}&mode=${activeSearchMode}`);
     const data = await r.json();
     if (!r.ok) {
       el.innerHTML = `<div class="empty-state" style="color:var(--danger)">${data.error || 'Erro no Scryfall'}</div>`;
@@ -2255,7 +2302,7 @@ async function loadCockatriceDeckList() {
           </div>
           <div class="cock-meta">${d.filename} · ${d.total} cartas</div>
         </div>
-        <button class="cock-load" onclick='loadCockatriceDeck(${JSON.stringify(d.filename)}, ${JSON.stringify(d.name)})'>Abrir</button>
+        <button class="cock-load" data-file="${d.filename.replace(/"/g,'&quot;')}" data-name="${d.name.replace(/"/g,'&quot;')}">Abrir</button>
       </div>
     `).join('');
   } catch {
@@ -2369,6 +2416,13 @@ async function saveCockatriceDeck() {
 }
 
 document.getElementById('cockSaveBtn').addEventListener('click', saveCockatriceDeck);
+
+// Delegação de evento para botões "Abrir" dos decks Cockatrice
+document.getElementById('cockDecksList').addEventListener('click', e => {
+  const btn = e.target.closest('.cock-load');
+  if (!btn) return;
+  loadCockatriceDeck(btn.dataset.file, btn.dataset.name);
+});
 
 // Carrega lista ao abrir a aba Cockatrice
 document.querySelectorAll('#inputTabs .tab').forEach(tab => {
