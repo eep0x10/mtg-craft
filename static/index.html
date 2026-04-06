@@ -964,6 +964,23 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
   line-height: 1.5;
   pointer-events: none;
 }
+.cgr-retry {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(201,168,76,.18);
+  border: 1px solid var(--gold2);
+  color: var(--gold);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  display: none;
+  z-index: 2;
+}
+.cgr-retry:hover { background: rgba(201,168,76,.35); }
+.cgr-item.no-img .cgr-retry { display: block; }
+.cgr-item.no-img .cgr-thumb img { opacity: .15; }
 .cgr-dfc {
   position: absolute;
   top: 3px; left: 3px;
@@ -1285,6 +1302,7 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
       <div class="dsb-row"><span class="dsb-lbl">🌿 Encantamentos</span><span class="dsb-val zero" id="dsbEnchantment">0</span></div>
       <div class="dsb-row"><span class="dsb-lbl">✨ Planeswalkers</span><span class="dsb-val zero" id="dsbPlaneswalker">0</span></div>
       <div class="dsb-row"><span class="dsb-lbl">📦 Outros</span><span class="dsb-val zero" id="dsbOther">0</span></div>
+      <div class="dsb-row"><span class="dsb-lbl">❓ Desconhecido</span><span class="dsb-val zero" id="dsbUnknown">0</span></div>
     </div>
   </div>
   <div class="panel-body" style="padding: 12px 14px">
@@ -1355,6 +1373,13 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 
 <script>
 // ═══════════════════════════════════════════════════════════════
+// Utils
+// ═══════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Estado global
 // ═══════════════════════════════════════════════════════════════
 let deck = [];
@@ -1372,7 +1397,8 @@ let activeLang = 'en';
 let activeSearchMode = 'name';
 
 function cardCategory(typeStr) {
-  const t = (typeStr || '').toLowerCase();
+  if (!typeStr || typeStr === 'Unknown') return 'unknown';
+  const t = typeStr.toLowerCase();
   if (t.includes('land'))         return 'land';
   if (t.includes('creature'))     return 'creature';
   if (t.includes('planeswalker')) return 'planeswalker';
@@ -1462,7 +1488,7 @@ async function doSearch() {
     const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&lang=${activeLang}&mode=${activeSearchMode}`);
     const data = await r.json();
     if (!r.ok) {
-      el.innerHTML = `<div class="empty-state" style="color:var(--danger)">${data.error || 'Erro no Scryfall'}</div>`;
+      el.innerHTML = `<div class="empty-state" style="color:var(--danger)">${escapeHtml(data.error) || 'Erro no Scryfall'}</div>`;
       return;
     }
     if (!data.length) {
@@ -1470,11 +1496,11 @@ async function doSearch() {
       return;
     }
     el.innerHTML = data.map(c => `
-      <div class="search-result" data-id="${c.id}">
-        <img src="${c.thumb}" alt="${c.name}" loading="lazy" onerror="this.style.background='#222'">
+      <div class="search-result" data-id="${escapeHtml(c.id)}">
+        <img src="${escapeHtml(c.thumb)}" alt="${escapeHtml(c.name)}" loading="lazy" onerror="this.style.background='#222'">
         <div class="sr-info">
-          <div class="sr-name">${c.name}${c.is_dfc ? ' <span class="dfc-badge">F/V</span>' : ''}</div>
-          <div class="sr-set">${c.set_name} · ${(c.set_code||'').toUpperCase()} #${c.collector_number||'?'}</div>
+          <div class="sr-name">${escapeHtml(c.name)}${c.is_dfc ? ' <span class="dfc-badge">F/V</span>' : ''}</div>
+          <div class="sr-set">${escapeHtml(c.set_name)} · ${escapeHtml((c.set_code||'').toUpperCase())} #${escapeHtml(c.collector_number||'?')}</div>
         </div>
         <div class="sr-add">+</div>
       </div>
@@ -1529,25 +1555,25 @@ async function resolveImportLines(log) {
         return Array.isArray(d) ? d : [];
       };
     } else {
-      log.innerHTML += `<div style="color:var(--muted)">— ${line}</div>`;
+      log.innerHTML += `<div style="color:var(--muted)">— ${escapeHtml(line)}</div>`;
       continue;
     }
 
-    log.innerHTML += `<div style="color:var(--text2)">🔍 ${displayName}…</div>`;
+    log.innerHTML += `<div style="color:var(--text2)">🔍 ${escapeHtml(displayName)}…</div>`;
     log.scrollTop = log.scrollHeight;
     try {
       const results = await fetchFn();
       if (results.length && results[0].png) {
         resolved.push({ card: results[0], qty });
         const fallback = results[0].lang_fallback ? ' <span style="color:var(--warn)">[EN fallback]</span>' : '';
-        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name} · ${(results[0].set_code||'').toUpperCase()}${fallback}</div>`;
+        log.innerHTML += `<div style="color:var(--success)">✓ ${escapeHtml(results[0].name)} · ${escapeHtml((results[0].set_code||'').toUpperCase())}${fallback}</div>`;
         ok++;
       } else {
-        log.innerHTML += `<div style="color:var(--warn)">⚠ Não encontrado: ${displayName}</div>`;
+        log.innerHTML += `<div style="color:var(--warn)">⚠ Não encontrado: ${escapeHtml(displayName)}</div>`;
         fail++;
       }
     } catch {
-      log.innerHTML += `<div style="color:var(--danger)">✗ Erro: ${displayName}</div>`;
+      log.innerHTML += `<div style="color:var(--danger)">✗ Erro: ${escapeHtml(displayName)}</div>`;
       fail++;
     }
     log.scrollTop = log.scrollHeight;
@@ -1606,11 +1632,11 @@ document.getElementById('importBtn').addEventListener('click', async () => {
         return Array.isArray(d) ? d : [];
       };
     } else {
-      log.innerHTML += `<div style="color:var(--muted)">— ${line}</div>`;
+      log.innerHTML += `<div style="color:var(--muted)">— ${escapeHtml(line)}</div>`;
       continue;
     }
 
-    log.innerHTML += `<div style="color:var(--text2)">🔍 ${displayName}…</div>`;
+    log.innerHTML += `<div style="color:var(--text2)">🔍 ${escapeHtml(displayName)}…</div>`;
     log.scrollTop = log.scrollHeight;
     try {
       const results = await fetchFn();
@@ -1624,14 +1650,14 @@ document.getElementById('importBtn').addEventListener('click', async () => {
           addCard(results[0], qty, true);
         }
         const fb = results[0].lang_fallback ? ' <span style="color:var(--warn)">[EN]</span>' : '';
-        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name} · ${(results[0].set_code||'').toUpperCase()}${fb}</div>`;
+        log.innerHTML += `<div style="color:var(--success)">✓ ${escapeHtml(results[0].name)} · ${escapeHtml((results[0].set_code||'').toUpperCase())}${fb}</div>`;
         ok++;
       } else {
-        log.innerHTML += `<div style="color:var(--warn)">⚠ Não encontrado: ${displayName}</div>`;
+        log.innerHTML += `<div style="color:var(--warn)">⚠ Não encontrado: ${escapeHtml(displayName)}</div>`;
         fail++;
       }
     } catch {
-      log.innerHTML += `<div style="color:var(--danger)">✗ Erro: ${displayName}</div>`;
+      log.innerHTML += `<div style="color:var(--danger)">✗ Erro: ${escapeHtml(displayName)}</div>`;
       fail++;
     }
     log.scrollTop = log.scrollHeight;
@@ -1670,7 +1696,7 @@ document.getElementById('importSaveNewBtn').addEventListener('click', async () =
   persistDecks(saved);
   renderSavedDecks();
 
-  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ Deck "${name.trim()}" salvo: ${ok} OK · ${fail} falha(s)</div>`;
+  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ Deck &ldquo;${escapeHtml(name.trim())}&rdquo; salvo: ${ok} OK · ${fail} falha(s)</div>`;
   log.scrollTop = log.scrollHeight;
   btn.disabled = false;
   toast(`Deck "${name.trim()}" salvo!`, 'ok');
@@ -1699,7 +1725,7 @@ document.getElementById('importMergeBtn').addEventListener('click', async () => 
   persistDecks(saved);
   renderSavedDecks();
 
-  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ Mesclado em "${targetName}": ${ok} OK · ${fail} falha(s)</div>`;
+  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ Mesclado em &ldquo;${escapeHtml(targetName)}&rdquo;: ${ok} OK · ${fail} falha(s)</div>`;
   log.scrollTop = log.scrollHeight;
   btn.disabled = false;
   toast(`Lista mesclada em "${targetName}"`, 'ok');
@@ -1710,7 +1736,7 @@ function refreshMergeSelect() {
   const sel   = document.getElementById('mergeTargetSelect');
   const saved = loadSavedDecks();
   sel.innerHTML = '<option value="">Mesclar em deck salvo…</option>' +
-    saved.map(d => `<option value="${d.name.replace(/"/g,'&quot;')}">${d.name} (${d.totalCards} cartas)</option>`).join('');
+    saved.map(d => `<option value="${escapeHtml(d.name)}">${escapeHtml(d.name)} (${d.totalCards} cartas)</option>`).join('');
 }
 document.querySelectorAll('#inputTabs .tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -1778,6 +1804,19 @@ function addCard(card, qty = 1, silent = false) {
   }
 }
 
+async function retryCardImage(idx) {
+  const c = deck[idx];
+  if (!c) return;
+  const card = await scryfallFetchCard(c.name);
+  if (card && card.thumb) {
+    deck[idx] = { ...c, ...card, qty: c.qty, _zone: c._zone };
+    renderDeck();
+    toast(`↺ ${c.name} carregado`, 'ok');
+  } else {
+    toast(`Não encontrado: ${c.name}`, 'err');
+  }
+}
+
 function removeCard(idx) {
   deck.splice(idx, 1);
   renderDeck();
@@ -1820,15 +1859,18 @@ function renderDeck() {
 
   el.style.display = '';   // restaura grid
 
-  el.innerHTML = deck.map((c, i) => `
-    <div class="cgr-item"
+  el.innerHTML = deck.map((c, i) => {
+    const noImg = !c.thumb && !c.normal;
+    return `
+    <div class="cgr-item${noImg ? ' no-img' : ''}"
       data-idx="${i}"
-      data-img="${c.normal || c.thumb || ''}"
-      data-back="${c.back_thumb || ''}"
+      data-img="${escapeHtml(c.normal || c.thumb || '')}"
+      data-back="${escapeHtml(c.back_thumb || '')}"
     >
       <div class="cgr-thumb">
-        <img src="${c.thumb||''}" alt="${c.name}" loading="lazy" onerror="this.style.background='#222'">
-        ${c.is_dfc ? '<span class="cgr-dfc">F/V</span>' : (c.lang && c.lang !== 'en' ? `<span class="cgr-dfc" style="background:var(--warn);color:#1a0f00">${c.lang.toUpperCase()}</span>` : '')}
+        <img src="${escapeHtml(c.thumb||'')}" alt="${escapeHtml(c.name)}" loading="lazy" onerror="this.style.opacity='.1'">
+        ${noImg ? `<button class="cgr-retry" onclick="retryCardImage(${i})" title="Tentar carregar imagem">↺</button>` : ''}
+        ${c.is_dfc ? '<span class="cgr-dfc">F/V</span>' : (c.lang && c.lang !== 'en' ? `<span class="cgr-dfc" style="background:var(--warn);color:#1a0f00">${escapeHtml(c.lang.toUpperCase())}</span>` : '')}
         <span class="cgr-qty">${c.qty}</span>
         <div class="cgr-actions">
           <button class="cgr-btn" onclick="changeQty(${i},-1)" title="Remover 1">−</button>
@@ -1836,25 +1878,26 @@ function renderDeck() {
           <button class="cgr-btn" onclick="changeQty(${i},+1)" title="Adicionar 1">+</button>
         </div>
       </div>
-      <div class="cgr-name" title="${c.name}">${c.name}</div>
+      <div class="cgr-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</div>
     </div>
-  `).join('');
+  `}).join('');
 
   // Hover preview
   attachCardHover();
 }
 
 function renderDeckStats() {
-  const counts = {creature:0,land:0,instant:0,sorcery:0,artifact:0,enchantment:0,planeswalker:0,other:0};
+  const counts = {creature:0,land:0,instant:0,sorcery:0,artifact:0,enchantment:0,planeswalker:0,other:0,unknown:0};
   for (const c of deck) {
-    counts[cardCategory(c.type_line)] += c.qty;
+    const cat = cardCategory(c.type_line);
+    counts[cat] = (counts[cat] || 0) + c.qty;
   }
-  const map = {creature:'dsbCreature',land:'dsbLand',instant:'dsbInstant',sorcery:'dsbSorcery',artifact:'dsbArtifact',enchantment:'dsbEnchantment',planeswalker:'dsbPlaneswalker',other:'dsbOther'};
+  const map = {creature:'dsbCreature',land:'dsbLand',instant:'dsbInstant',sorcery:'dsbSorcery',artifact:'dsbArtifact',enchantment:'dsbEnchantment',planeswalker:'dsbPlaneswalker',other:'dsbOther',unknown:'dsbUnknown'};
   for (const [cat, id] of Object.entries(map)) {
     const el = document.getElementById(id);
     if (!el) continue;
-    el.textContent = counts[cat];
-    el.className = 'dsb-val' + (counts[cat] === 0 ? ' zero' : '');
+    el.textContent = counts[cat] || 0;
+    el.className = 'dsb-val' + (!counts[cat] ? ' zero' : '');
   }
 }
 
@@ -2078,12 +2121,14 @@ function deleteSavedDeck(name) {
 }
 
 function loadSavedDeck(name) {
+  _cockLoadGen++; // cancela qualquer carga Cockatrice em andamento
   const entry = loadSavedDecks().find(d => d.name === name);
   if (!entry) return;
   deck = entry.cards.map(c => ({ ...c }));
   renderDeck();
   renderPreview();
   toast(`Deck "${name}" carregado`, 'ok');
+  setTimeout(() => enrichTypeLine(), 200);
 }
 
 function renderSavedDecks() {
@@ -2103,7 +2148,7 @@ function renderSavedDecks() {
     <div class="saved-deck-item" style="margin-bottom:6px">
       <span class="sdi-icon">🃏</span>
       <div class="sdi-info">
-        <div class="sdi-name">${d.name}</div>
+        <div class="sdi-name">${escapeHtml(d.name)}</div>
         <div class="sdi-meta">${d.totalCards} carta${d.totalCards!==1?'s':''} · ${new Date(d.savedAt).toLocaleDateString('pt-BR')}</div>
       </div>
       <button class="sdi-load" onclick='loadSavedDeck(${JSON.stringify(d.name)})'>Carregar</button>
@@ -2140,7 +2185,7 @@ async function importDeckByUrl() {
   const log = document.getElementById('importLog');
   btn.disabled = true;
   btn.textContent = '…';
-  log.innerHTML = `<div style="color:var(--text2)"><span class="spinner"></span>Baixando deck de ${url.split('/')[2] || 'URL'}…</div>`;
+  log.innerHTML = `<div style="color:var(--text2)"><span class="spinner"></span>Baixando deck de ${escapeHtml(url.split('/')[2] || 'URL')}…</div>`;
 
   let deckMeta;
   try {
@@ -2149,10 +2194,11 @@ async function importDeckByUrl() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
     });
-    deckMeta = await r.json();
-    if (!r.ok) { log.innerHTML += `<div style="color:var(--danger)">✗ ${deckMeta.error}</div>`; return; }
+    const text = await r.text();
+    try { deckMeta = JSON.parse(text); } catch { deckMeta = { error: text.slice(0, 200) }; }
+    if (!r.ok) { log.innerHTML += `<div style="color:var(--danger)">✗ ${escapeHtml(deckMeta.error) || r.status}</div>`; return; }
   } catch (e) {
-    log.innerHTML += `<div style="color:var(--danger)">✗ Erro de conexão</div>`;
+    log.innerHTML += `<div style="color:var(--danger)">✗ Servidor não responde — reinicie o start.bat</div>`;
     return;
   } finally {
     btn.disabled = false;
@@ -2160,48 +2206,87 @@ async function importDeckByUrl() {
   }
 
   const { source, name: deckName, cards } = deckMeta;
-  log.innerHTML += `<div style="color:var(--gold)">✦ ${deckName} (${source}) · ${cards.length} entradas</div>`;
+  log.innerHTML += `<div style="color:var(--gold)">✦ ${escapeHtml(deckName)} (${escapeHtml(source)}) · ${cards.length} entradas</div>`;
 
+  log.innerHTML += `<div style="color:var(--text2)">Buscando ${cards.length} cartas…</div>`;
+  log.scrollTop = log.scrollHeight;
+
+  // Converte resposta Scryfall para card object
+  const sfToCard = d => {
+    const faces = d.card_faces || [];
+    const top   = d.image_uris;
+    const isDfc = !top && faces.length >= 2 && faces[0].image_uris && faces[1].image_uris;
+    const front = isDfc ? faces[0].image_uris : (top || (faces[0] && faces[0].image_uris) || {});
+    const back  = isDfc ? faces[1].image_uris : {};
+    return {
+      id: d.id, name: d.name,
+      set_name: d.set_name||'', set_code: d.set||'',
+      collector_number: d.collector_number||'', lang: d.lang||'en',
+      is_dfc: isDfc,
+      type_line: d.type_line||(faces[0]&&faces[0].type_line)||'',
+      thumb: front.small||'', normal: front.normal||'', png: front.png||'',
+      back_thumb: back.small||'', back_png: back.png||'',
+    };
+  };
+
+  // Busca em lotes de 75 via /cards/collection
+  // Usa set+número para preservar a arte exata do Moxfield; fallback por nome
+  const BATCH = 75;
+  const resultMap = {}; // chave "SET/NUM" ou "name:NOME" → card object
+
+  for (let i = 0; i < cards.length; i += BATCH) {
+    const batch = cards.slice(i, i + BATCH);
+    const identifiers = batch.map(e =>
+      e.set && e.number
+        ? { set: e.set.toLowerCase(), collector_number: String(e.number) }
+        : { name: e.name }
+    );
+    try {
+      const r = await fetch('https://api.scryfall.com/cards/collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifiers }),
+      });
+      if (r.ok) {
+        const col = await r.json();
+        for (const d of (col.data || [])) {
+          // Indexa por set+número E por nome para conseguir match
+          const key = `${d.set}/${d.collector_number}`;
+          resultMap[key] = sfToCard(d);
+          resultMap[`name:${d.name.toLowerCase()}`] = sfToCard(d);
+        }
+      }
+    } catch { /* tenta continuar com o que tiver */ }
+    if (i + BATCH < cards.length) await new Promise(r => setTimeout(r, 150));
+  }
+
+  // Monta deck com os resultados
   let ok = 0, fail = 0;
   for (const entry of cards) {
-    let displayName, fetchFn;
-    if (entry.set && entry.number) {
-      displayName = `${entry.name} (${entry.set}) ${entry.number}`;
-      fetchFn = async () => {
-        const r = await fetch(`/api/card-by-set/${encodeURIComponent(entry.set)}/${encodeURIComponent(entry.number)}?lang=${activeLang}`);
-        const d = await r.json();
-        return r.ok ? [d] : [];
-      };
-    } else {
-      displayName = entry.name;
-      fetchFn = async () => {
-        const r = await fetch(`/api/search?q=!"${encodeURIComponent(entry.name)}"&lang=${activeLang}`);
-        const d = await r.json();
-        return Array.isArray(d) ? d : [];
-      };
-    }
+    const setKey  = entry.set && entry.number ? `${entry.set.toLowerCase()}/${entry.number}` : null;
+    const nameKey = `name:${entry.name.toLowerCase()}`;
+    const card    = (setKey && resultMap[setKey]) || resultMap[nameKey];
 
-    log.innerHTML += `<div style="color:var(--text2)">🔍 ${displayName}…</div>`;
-    log.scrollTop = log.scrollHeight;
-    try {
-      const results = await fetchFn();
-      if (results.length && results[0].png) {
-        addCard(results[0], entry.qty || 1);
-        const fallback = results[0].lang_fallback ? ' <span style="color:var(--warn)">[EN]</span>' : '';
-        log.innerHTML += `<div style="color:var(--success)">✓ ${results[0].name}${fallback}</div>`;
-        ok++;
-      } else {
-        log.innerHTML += `<div style="color:var(--warn)">⚠ ${displayName}</div>`;
-        fail++;
-      }
-    } catch {
-      log.innerHTML += `<div style="color:var(--danger)">✗ Erro: ${displayName}</div>`;
+    if (card && card.png) {
+      addCard(card, entry.qty || 1, true);
+      ok++;
+    } else {
       fail++;
     }
-    log.scrollTop = log.scrollHeight;
-    await new Promise(r => setTimeout(r, 120));
   }
-  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ ${deckName}: ${ok} OK · ${fail} falha(s)</div>`;
+
+  renderDeck(); renderPreview();
+  log.innerHTML += `<div style="color:var(--gold);font-weight:600;margin-top:6px">✦ ${escapeHtml(deckName)}: ${ok} OK${fail ? ` · ${fail} não encontradas` : ''}</div>`;
+  if (fail) {
+    const notFound = cards.filter(e => {
+      const setKey  = e.set && e.number ? `${e.set.toLowerCase()}/${e.number}` : null;
+      const nameKey = `name:${e.name.toLowerCase()}`;
+      return !((setKey && resultMap[setKey]) || resultMap[nameKey]);
+    });
+    notFound.forEach(e => {
+      log.innerHTML += `<div style="color:var(--warn)">⚠ ${escapeHtml(e.name)}</div>`;
+    });
+  }
   log.scrollTop = log.scrollHeight;
   if (isMobile()) switchMobilePanel(1);
   if (deckName) {
@@ -2253,18 +2338,66 @@ document.getElementById('imgUrlBtn').addEventListener('click', async () => {
 // ═══════════════════════════════════════════════════════════════
 // Enriquecimento de type_line (para cartas sem esse campo)
 // ═══════════════════════════════════════════════════════════════
+// Busca carta no Scryfall direto do frontend.
+// 1ª tentativa: exact + idioma ativo (se != en)
+// 2ª tentativa: exact inglês
+// 3ª tentativa: fuzzy inglês
+// Retorna objeto card normalizado ou null se não encontrar.
+async function scryfallFetchCard(name) {
+  const SF = 'https://api.scryfall.com/cards/named';
+  const toCard = d => {
+    const faces = d.card_faces || [];
+    const top   = d.image_uris;
+    const isDfc = !top && faces.length >= 2 && faces[0].image_uris && faces[1].image_uris;
+    const front = isDfc ? faces[0].image_uris : (top || (faces[0] && faces[0].image_uris) || {});
+    const back  = isDfc ? faces[1].image_uris : {};
+    return {
+      id:               d.id,
+      name:             d.name,
+      set_name:         d.set_name  || '',
+      set_code:         d.set       || '',
+      collector_number: d.collector_number || '',
+      lang:             d.lang      || 'en',
+      is_dfc:           isDfc,
+      type_line:        d.type_line || (faces[0] && faces[0].type_line) || '',
+      thumb:            front.small  || '',
+      normal:           front.normal || '',
+      png:              front.png    || '',
+      back_thumb:       back.small   || '',
+      back_png:         back.png     || '',
+    };
+  };
+
+  // Tenta idioma ativo primeiro (se não-inglês)
+  if (activeLang !== 'en') {
+    const r = await fetch(`${SF}?exact=${encodeURIComponent(name)}&lang=${activeLang}`);
+    if (r.ok) return toCard(await r.json());
+  }
+  // Exact inglês
+  const r2 = await fetch(`${SF}?exact=${encodeURIComponent(name)}`);
+  if (r2.ok) return toCard(await r2.json());
+  // Fuzzy inglês (lida com variações de grafia, caracteres especiais)
+  const r3 = await fetch(`${SF}?fuzzy=${encodeURIComponent(name)}`);
+  if (r3.ok) return toCard(await r3.json());
+  return null;
+}
+
 async function enrichTypeLine() {
   const missing = deck.filter(c => !c.type_line && c.name && c.type !== 'upload');
   if (!missing.length) return;
   for (const card of missing) {
     try {
-      const r = await fetch(`/api/card-info?name=${encodeURIComponent(card.name)}`);
+      const r = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(card.name)}`);
       if (r.ok) {
         const d = await r.json();
         card.type_line = d.type_line || '';
-        // Aproveita para atualizar imagens se estiver faltando
-        if (!card.normal && d.normal) card.normal = d.normal;
-        if (!card.thumb  && d.thumb)  card.thumb  = d.thumb;
+        // Aproveita para preencher imagens se estiverem faltando
+        const imgs = d.image_uris || (d.card_faces && d.card_faces[0].image_uris) || {};
+        if (!card.normal && imgs.normal) card.normal = imgs.normal;
+        if (!card.thumb  && imgs.small)  card.thumb  = imgs.small;
+      } else {
+        // Carta não encontrada no Scryfall (token, custom, upload)
+        card.type_line = 'Unknown';
       }
     } catch { /* silencioso */ }
     await new Promise(r => setTimeout(r, 80)); // respeita rate limit Scryfall
@@ -2276,6 +2409,7 @@ async function enrichTypeLine() {
 // Cockatrice Integration
 // ═══════════════════════════════════════════════════════════════
 let cockCurrentFile = null; // arquivo .cod aberto no momento
+let _cockLoadGen = 0;       // token de cancelamento: incrementa a cada nova carga
 
 async function loadCockatriceDeckList() {
   const el = document.getElementById('cockDecksList');
@@ -2311,11 +2445,13 @@ async function loadCockatriceDeckList() {
 }
 
 async function loadCockatriceDeck(filename, deckName) {
+  const myGen = ++_cockLoadGen; // token desta carga; qualquer carga posterior invalida esta
   toast(`Abrindo ${deckName}…`, '');
   try {
     const r = await fetch(`/api/cockatrice/deck/${encodeURIComponent(filename)}`);
     const data = await r.json();
     if (!r.ok) { toast(data.error, 'err'); return; }
+    if (myGen !== _cockLoadGen) return; // foi cancelado
 
     // Limpa deck atual e carrega as cartas
     deck = [];
@@ -2329,44 +2465,90 @@ async function loadCockatriceDeck(filename, deckName) {
 
     loadCockatriceDeckList(); // atualiza badge ABERTO
 
-    // Importa cada carta buscando no Scryfall
-    const mainCards = data.cards.filter(c => c.zone === 'main');
-    const sideCards = data.cards.filter(c => c.zone === 'side');
-    const allCards  = [...mainCards, ...sideCards];
+    // Importa via Scryfall /cards/collection (batch de 75 por request)
+    const allCards = [
+      ...data.cards.filter(c => c.zone === 'main'),
+      ...data.cards.filter(c => c.zone === 'side'),
+    ];
 
-    let ok = 0, fail = 0;
-    for (const entry of allCards) {
+    // Mapa nome → metadados do .cod (qty, zone) — deduplica nomes únicos
+    const byName = {};
+    for (const e of allCards) {
+      if (!byName[e.name]) byName[e.name] = { qty: 0, zone: e.zone };
+      byName[e.name].qty += e.qty;
+    }
+    const uniqueNames = Object.keys(byName);
+
+    // Busca em lotes de 75 (limite do Scryfall)
+    const sfCards = {}; // nome normalizado → card object
+    const BATCH = 75;
+    for (let i = 0; i < uniqueNames.length; i += BATCH) {
+      if (myGen !== _cockLoadGen) return;
+      const batch = uniqueNames.slice(i, i + BATCH);
       try {
-        const r2 = await fetch(`/api/card-info?name=${encodeURIComponent(entry.name)}&lang=${activeLang}`);
+        const r2 = await fetch('https://api.scryfall.com/cards/collection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifiers: batch.map(n => ({ name: n })) }),
+        });
+        if (myGen !== _cockLoadGen) return;
         if (r2.ok) {
-          const card = await r2.json();
-          // marca zona para eventual save-back
-          card._zone = entry.zone;
-          addCard(card, entry.qty, true);
-          ok++;
-        } else {
-          // Carta não encontrada no Scryfall (tokens, custom, etc.)
-          deck.push({
-            id:       `cock_${entry.name.replace(/\s/g,'_')}`,
-            name:     entry.name,
-            set_name: '',
-            set_code: '',
-            thumb:    '',
-            normal:   '',
-            png:      '',
-            type_line: '',
-            is_dfc:   false,
-            qty:      entry.qty,
-            _zone:    entry.zone,
-            type:     'cockatrice',
-          });
-          renderDeck(); renderPreview();
-          fail++;
+          const col = await r2.json();
+          for (const c of (col.data || [])) {
+            const faces = c.card_faces || [];
+            const top   = c.image_uris;
+            const isDfc = !top && faces.length >= 2 && faces[0].image_uris && faces[1].image_uris;
+            const front = isDfc ? faces[0].image_uris : (top || (faces[0] && faces[0].image_uris) || {});
+            const back  = isDfc ? faces[1].image_uris : {};
+            sfCards[c.name] = {
+              id:               c.id,
+              name:             c.name,
+              set_name:         c.set_name  || '',
+              set_code:         c.set       || '',
+              collector_number: c.collector_number || '',
+              lang:             c.lang      || 'en',
+              is_dfc:           isDfc,
+              type_line:        c.type_line || (faces[0] && faces[0].type_line) || '',
+              thumb:            front.small  || '',
+              normal:           front.normal || '',
+              png:              front.png    || '',
+              back_thumb:       back.small   || '',
+              back_png:         back.png     || '',
+            };
+          }
         }
-      } catch {
+      } catch { /* silencioso, cards ausentes ficam como not_found */ }
+      if (i + BATCH < uniqueNames.length) await new Promise(r => setTimeout(r, 120));
+    }
+
+    if (myGen !== _cockLoadGen) return;
+
+    // Monta o deck com os resultados
+    let ok = 0, fail = 0;
+    for (const name of uniqueNames) {
+      const meta = byName[name];
+      const card = sfCards[name];
+      if (card) {
+        card._zone = meta.zone;
+        addCard(card, meta.qty, true);
+        ok++;
+      } else {
+        deck.push({
+          id:        `cock_${name.replace(/\s/g,'_')}`,
+          name,
+          set_name:  '',
+          set_code:  '',
+          thumb:     '',
+          normal:    '',
+          png:       '',
+          type_line: 'Unknown',
+          is_dfc:    false,
+          qty:       meta.qty,
+          _zone:     meta.zone,
+          type:      'cockatrice',
+        });
         fail++;
       }
-      await new Promise(r => setTimeout(r, 80));
     }
     renderDeck(); renderPreview();
     toast(`${deckName} carregado — ${ok} cartas${fail ? ' · '+fail+' não encontradas' : ''}`, 'ok');
@@ -2431,12 +2613,6 @@ document.querySelectorAll('#inputTabs .tab').forEach(tab => {
   });
 });
 
-// Enriquece type_line quando uma função loadSavedDeck ou importDeckByUrl termina
-const _origLoadSavedDeck = loadSavedDeck;
-function loadSavedDeck(name) {
-  _origLoadSavedDeck(name);
-  setTimeout(() => enrichTypeLine(), 200);
-}
 </script>
 </body>
 </html>

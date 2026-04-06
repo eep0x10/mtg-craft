@@ -1,0 +1,24 @@
+services:
+  mtg-craft:
+    build: .
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./cache:/app/cache
+      - ./uploads:/app/uploads
+      - ./static:/app/static
+      - C:\Users\eep0x10\AppData\Local\Cockatrice\Cockatrice\decks:/cockatrice/decks:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3

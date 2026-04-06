@@ -151,9 +151,6 @@ def build_page(
     """
     page = doc.new_page(width=PAGE_W, height=PAGE_H)
 
-    if logo_path and logo_path.exists():
-        page.insert_image(LOGO_RECT, filename=str(logo_path), keep_proportion=True)
-
     for i, img_path in enumerate(images[:CARDS_PER_PAGE]):
         if img_path is None:
             continue          # slot vazio — mantém a grade mas sem imagem

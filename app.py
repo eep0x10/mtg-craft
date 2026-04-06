@@ -2,23 +2,12 @@
 """
 MTG Craft — Backend Flask
 Porta: 5001
-
-Endpoints:
-  GET  /                       → frontend SPA
-  GET  /api/search?q=<query>   → busca no Scryfall
-  POST /api/upload             → upload de imagem local
-  GET  /api/thumb/<file>       → serve thumbnail de upload
-  POST /api/generate           → gera e retorna o PDF
-  POST /api/import-deck-url    → importa deck por URL (Moxfield, Archidekt)
-  POST /api/proxy-image        → baixa imagem de URL externa (MTGBuilder, etc.)
-  GET  /api/card-info?name=    → busca type_line + imagens por nome exato
-  GET  /api/cockatrice/decks   → lista arquivos .cod no diretório Cockatrice
-  GET  /api/cockatrice/deck/<f>→ lê e parseia um arquivo .cod
-  POST /api/cockatrice/save    → salva deck atual como .cod
 """
 
 import hashlib
 import io
+import ipaddress
+import os
 import re
 import tempfile
 import time
@@ -26,6 +15,7 @@ import uuid
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 import fitz
 import requests as req
@@ -41,13 +31,63 @@ CACHE_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 app = Flask(__name__, static_folder="static")
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB max upload
 
 SCRYFALL = "https://api.scryfall.com"
 HEADERS  = {"User-Agent": "CardPDFGen/1.0"}
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.moxfield.com/",
+    "Origin": "https://www.moxfield.com",
+}
 _last_req = 0.0
+
+# ── Security headers ───────────────────────────────────────────────────────
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
+
+def _safe_path(base: Path, filename: str) -> Path:
+    """Resolve path e garante que permanece dentro de base. Lança ValueError se não."""
+    p = (base / Path(filename).name).resolve()
+    base_resolved = base.resolve()
+    p.relative_to(base_resolved)  # lança ValueError se sair do base
+    return p
+
+
+def _validate_external_url(url: str) -> bool:
+    """Bloqueia SSRF: aceita apenas http/https para hosts públicos."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname or ""
+        if not hostname:
+            return False
+        # Bloqueia hostnames internos óbvios
+        blocked = ("localhost", "127.", "0.0.0.0", "::1", "169.254.", "10.", "192.168.", "172.")
+        if any(hostname.startswith(b) or hostname == b.rstrip(".") for b in blocked):
+            return False
+        # Tenta parse como IP — bloqueia privados/loopback
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
+                return False
+        except ValueError:
+            pass  # é hostname, não IP — ok
+        return True
+    except Exception:
+        return False
+
 
 def scryfall(url: str, **params) -> req.Response:
     """GET com rate-limit de 100ms."""
@@ -61,22 +101,14 @@ def scryfall(url: str, **params) -> req.Response:
 
 
 def card_data(c: dict) -> dict:
-    """
-    Extrai os campos relevantes de um objeto Scryfall.
-    Detecta DFCs (transform / modal_dfc) e expõe back_png + back_thumb.
-    """
     faces = c.get("card_faces") or []
     top_iuri = c.get("image_uris")
-
-    # É DFC imprimível quando NÃO há image_uris no nível raiz E
-    # ambas as faces têm image_uris próprias (transform, modal_dfc).
     is_dfc = (
         not top_iuri
         and len(faces) >= 2
         and bool(faces[0].get("image_uris"))
         and bool(faces[1].get("image_uris"))
     )
-
     if is_dfc:
         iuri_front = faces[0]["image_uris"]
         iuri_back  = faces[1]["image_uris"]
@@ -84,13 +116,11 @@ def card_data(c: dict) -> dict:
         iuri_front = top_iuri or (faces[0].get("image_uris") if faces else {}) or {}
         iuri_back  = {}
 
-    # type_line: prefer top-level; DFCs use front face
     type_line = (
         c.get("type_line")
         or (faces[0].get("type_line") if faces else "")
         or ""
     )
-
     return {
         "id":               c["id"],
         "name":             c["name"],
@@ -110,6 +140,8 @@ def card_data(c: dict) -> dict:
 
 def download_png(url: str) -> Path:
     """Baixa e cacheia uma imagem pelo URL."""
+    if not _validate_external_url(url):
+        raise ValueError(f"URL bloqueada por política de segurança: {url}")
     key  = hashlib.md5(url.encode()).hexdigest()
     path = CACHE_DIR / f"{key}.png"
     if not path.exists():
@@ -127,14 +159,11 @@ def index():
 
 
 def _build_query(q: str, mode: str) -> str:
-    """Monta a query Scryfall de acordo com o modo de busca."""
     q = q.strip()
     if mode == "oracle":
         return f'o:"{q}"'
     if mode == "both":
-        # nome contém OU texto contém
         return f'(name:{q} OR o:"{q}")'
-    # mode == "name" (padrão)
     return f"({q})"
 
 
@@ -142,7 +171,7 @@ def _build_query(q: str, mode: str) -> str:
 def search():
     q    = request.args.get("q", "").strip()
     lang = request.args.get("lang", "en").strip() or "en"
-    mode = request.args.get("mode", "name").strip()   # name | oracle | both
+    mode = request.args.get("mode", "name").strip()
     if not q:
         return jsonify([])
 
@@ -157,27 +186,19 @@ def search():
                 return jsonify([card_data(c) for c in results])
         lang = "en"
 
-    # Inglês (padrão ou fallback)
     query = f"{base} lang:en"
     r = scryfall(f"{SCRYFALL}/cards/search", q=query, order="name", unique="cards")
     if r.status_code == 404:
         return jsonify([])
     if not r.ok:
-        return jsonify({"error": r.json().get("details", "Erro Scryfall")}), 502
+        return jsonify({"error": "Erro ao buscar no Scryfall"}), 502
     results = r.json().get("data", [])[:20]
-    # Filtra qualquer resultado que não seja inglês (segurança extra)
     results = [c for c in results if c.get("lang", "en") == "en"]
     return jsonify([card_data(c) for c in results])
 
 
 @app.route("/api/card-by-set/<set_code>/<path:number>")
 def card_by_set(set_code: str, number: str):
-    """
-    Busca carta pelo set code + collector number exatos.
-    Se lang != en, tenta encontrar uma impressão naquele idioma via oracle_id.
-    Se não achar, retorna inglês com lang_fallback=True.
-    Ex: /api/card-by-set/pip/325  ou  /api/card-by-set/40k/86★
-    """
     lang = request.args.get("lang", "en").strip() or "en"
 
     r = scryfall(f"{SCRYFALL}/cards/{set_code.lower()}/{number}")
@@ -186,7 +207,6 @@ def card_by_set(set_code: str, number: str):
     c = r.json()
 
     if lang != "en":
-        # Tenta encontrar impressão no idioma solicitado via oracle_id
         oracle_id = c.get("oracle_id", "")
         if oracle_id:
             r2 = scryfall(
@@ -200,9 +220,7 @@ def card_by_set(set_code: str, number: str):
                 lang_prints = [p for p in prints if p.get("lang") == lang]
                 if lang_prints:
                     return jsonify(card_data(lang_prints[0]))
-        # Não encontrou no idioma — usa inglês com indicador de fallback
         data = card_data(c)
-        # Garante inglês: se a carta retornada não for en, busca impressão en
         if c.get("lang", "en") != "en":
             oracle_id = c.get("oracle_id", "")
             if oracle_id:
@@ -219,8 +237,6 @@ def card_by_set(set_code: str, number: str):
         data["lang_fallback"] = True
         return jsonify(data)
 
-    # Idioma inglês: comportamento original
-    # Se não for inglês, busca a impressão EN pelo oracle_id
     if c.get("lang", "en") != "en":
         oracle_id = c.get("oracle_id", "")
         if oracle_id:
@@ -234,7 +250,7 @@ def card_by_set(set_code: str, number: str):
                 prints = r2.json().get("data", [])
                 en_prints = [p for p in prints if p.get("lang") == "en"]
                 if en_prints:
-                    c = en_prints[0]  # impressão EN mais recente
+                    c = en_prints[0]
 
     return jsonify(card_data(c))
 
@@ -244,9 +260,22 @@ def upload():
     if "file" not in request.files:
         return jsonify({"error": "Nenhum arquivo enviado"}), 400
     f   = request.files["file"]
-    ext = Path(f.filename).suffix.lower()
+    ext = Path(f.filename).suffix.lower() if f.filename else ""
     if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
         return jsonify({"error": "Formato não suportado (use JPG/PNG/WEBP)"}), 400
+
+    # Valida magic bytes da imagem
+    header = f.read(16)
+    f.seek(0)
+    magic_ok = (
+        header[:8] == b"\x89PNG\r\n\x1a\n"           # PNG
+        or header[:3] == b"\xff\xd8\xff"              # JPEG
+        or header[:4] in (b"RIFF", b"WEBP")           # WEBP (approximate)
+        or b"WEBP" in header                           # WEBP via container
+    )
+    if not magic_ok:
+        return jsonify({"error": "Arquivo não é uma imagem válida"}), 400
+
     uid  = str(uuid.uuid4())
     dest = UPLOAD_DIR / f"{uid}{ext}"
     f.save(str(dest))
@@ -255,14 +284,17 @@ def upload():
         "name":  f.filename,
         "path":  str(dest),
         "thumb": f"/api/thumb/{uid}{ext}",
-        "png":   "",           # sem URL Scryfall
+        "png":   "",
         "type":  "upload",
     })
 
 
 @app.route("/api/thumb/<filename>")
 def thumb(filename: str):
-    p = UPLOAD_DIR / filename
+    try:
+        p = _safe_path(UPLOAD_DIR, filename)
+    except ValueError:
+        abort(404)
     if not p.exists():
         abort(404)
     return send_file(str(p))
@@ -275,17 +307,24 @@ def generate():
     if not card_list:
         return jsonify({"error": "Lista de cartas vazia"}), 400
 
-    # Separa cartas normais e DFCs (frente e verso)
     normal_paths: list[Path]        = []
     dfc_fronts:   list[Path]        = []
     dfc_backs:    list[Path]        = []
 
     for entry in card_list:
-        qty  = max(1, min(int(entry.get("qty", 1)), 20))
+        try:
+            qty = max(1, min(int(entry.get("qty", 1)), 20))
+        except (ValueError, TypeError):
+            return jsonify({"error": "Quantidade inválida"}), 400
         name = entry.get("name", "?")
 
         if entry.get("type") == "upload":
-            p = Path(entry.get("path", ""))
+            raw_path = entry.get("path", "")
+            try:
+                p = Path(raw_path).resolve()
+                p.relative_to(UPLOAD_DIR.resolve())
+            except (ValueError, Exception):
+                return jsonify({"error": f"Arquivo inválido: {name}"}), 400
             if not p.exists():
                 return jsonify({"error": f"Arquivo não encontrado: {name}"}), 400
             normal_paths.extend([p] * qty)
@@ -297,14 +336,16 @@ def generate():
 
         try:
             front_path = download_png(png_url)
-        except Exception as e:
-            return jsonify({"error": f"Erro ao baixar {name}: {e}"}), 502
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        except Exception:
+            return jsonify({"error": f"Erro ao baixar imagem de {name}"}), 502
 
         if entry.get("is_dfc") and entry.get("back_png"):
             try:
                 back_path = download_png(entry["back_png"])
-            except Exception as e:
-                return jsonify({"error": f"Erro ao baixar verso de {name}: {e}"}), 502
+            except Exception:
+                return jsonify({"error": f"Erro ao baixar verso de {name}"}), 502
             for _ in range(qty):
                 dfc_fronts.append(front_path)
                 dfc_backs.append(back_path)
@@ -315,9 +356,8 @@ def generate():
         return jsonify({"error": "Nenhuma imagem para gerar PDF"}), 400
 
     logo      = LOGO_PATH if LOGO_PATH.exists() else None
-    pdf_files: dict[str, bytes] = {}          # nome → conteúdo binário
+    pdf_files: dict[str, bytes] = {}
 
-    # ── PDF principal (cartas normais) ────────────────────────────────────────
     if normal_paths:
         doc = fitz.open()
         for start in range(0, len(normal_paths), CARDS_PER_PAGE):
@@ -326,14 +366,12 @@ def generate():
         doc.save(buf, garbage=4, deflate=True)
         pdf_files["deck.pdf"] = buf.getvalue()
 
-    # ── PDF frente/verso (DFCs) — duplex-ready ────────────────────────────────
     if dfc_fronts:
         dfc_doc = build_dfc_pdf(dfc_fronts, dfc_backs, logo)
         buf = io.BytesIO()
         dfc_doc.save(buf, garbage=4, deflate=True)
         pdf_files["dfc_frente_verso.pdf"] = buf.getvalue()
 
-    # ── Resposta ──────────────────────────────────────────────────────────────
     if len(pdf_files) == 1:
         name, content = next(iter(pdf_files.items()))
         return send_file(
@@ -343,7 +381,6 @@ def generate():
             mimetype="application/pdf",
         )
 
-    # Dois PDFs → ZIP
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for name, content in pdf_files.items():
@@ -359,11 +396,6 @@ def generate():
 
 @app.route("/api/import-deck-url", methods=["POST"])
 def import_deck_url():
-    """
-    Importa cartas de uma URL de deck externo.
-    Suporta: Moxfield, Archidekt.
-    Retorna lista de {qty, name, set, number} para a fila de importação.
-    """
     data = request.get_json(silent=True) or {}
     url  = data.get("url", "").strip()
     if not url:
@@ -373,10 +405,20 @@ def import_deck_url():
     mox = re.search(r"moxfield\.com/decks/([A-Za-z0-9_-]+)", url)
     if mox:
         deck_id = mox.group(1)
-        r = scryfall(f"https://api2.moxfield.com/v2/decks/all/{deck_id}")
+        try:
+            r = req.get(
+                f"https://api2.moxfield.com/v2/decks/all/{deck_id}",
+                headers=BROWSER_HEADERS,
+                timeout=20,
+            )
+        except Exception:
+            return jsonify({"error": "Moxfield: erro de conexão"}), 502
         if not r.ok:
-            return jsonify({"error": f"Moxfield: deck não encontrado ({deck_id})"}), 404
-        mox_data = r.json()
+            return jsonify({"error": f"Moxfield: deck não encontrado ou privado ({r.status_code})"}), 404
+        try:
+            mox_data = r.json()
+        except Exception:
+            return jsonify({"error": "Moxfield: resposta inválida"}), 502
         cards = []
         for section in ("mainboard", "sideboard", "commanders", "companion"):
             for entry in (mox_data.get(section) or {}).values():
@@ -411,39 +453,38 @@ def import_deck_url():
                 "set":    (ed.get("set") or "").upper(),
                 "number": str(ed.get("collectorNumber", "") or ""),
             })
-        return jsonify({
-            "source": "archidekt",
-            "name":   arch_data.get("name", "Deck"),
-            "cards":  cards,
-        })
+        return jsonify({"source": "archidekt", "name": arch_data.get("name", "Deck"), "cards": cards})
 
     return jsonify({"error": "URL não reconhecida. Suporta: Moxfield, Archidekt"}), 400
 
 
 @app.route("/api/proxy-image", methods=["POST"])
 def proxy_image():
-    """
-    Baixa uma imagem de qualquer URL pública e salva como upload local.
-    Usado para cartas custom do MTGBuilder ou outros sites.
-    """
-    data = request.get_json(silent=True) or {}
+    data      = request.get_json(silent=True) or {}
     image_url = data.get("url", "").strip()
     card_name = data.get("name", "Carta custom").strip() or "Carta custom"
+
     if not image_url:
         return jsonify({"error": "URL não fornecida"}), 400
-    if not image_url.startswith(("http://", "https://")):
-        return jsonify({"error": "URL inválida (use http:// ou https://)"}), 400
+    if not _validate_external_url(image_url):
+        return jsonify({"error": "URL inválida ou bloqueada"}), 400
 
     try:
-        r = req.get(image_url, timeout=20, headers=HEADERS)
+        r = req.get(image_url, timeout=15, headers=HEADERS, stream=True)
         r.raise_for_status()
+        # Limita tamanho
+        content = b""
+        for chunk in r.iter_content(1024 * 64):
+            content += chunk
+            if len(content) > 20 * 1024 * 1024:  # 20 MB
+                return jsonify({"error": "Imagem muito grande (máx 20 MB)"}), 413
         ct  = r.headers.get("content-type", "")
         ext = ".jpg"
         if "png"  in ct: ext = ".png"
         elif "webp" in ct: ext = ".webp"
         uid  = str(uuid.uuid4())
         dest = UPLOAD_DIR / f"{uid}{ext}"
-        dest.write_bytes(r.content)
+        dest.write_bytes(content)
         return jsonify({
             "id":    uid,
             "name":  card_name,
@@ -452,13 +493,15 @@ def proxy_image():
             "png":   "",
             "type":  "upload",
         })
-    except Exception as e:
-        return jsonify({"error": f"Erro ao baixar imagem: {e}"}), 502
+    except req.exceptions.Timeout:
+        return jsonify({"error": "Timeout ao baixar imagem"}), 504
+    except Exception:
+        return jsonify({"error": "Erro ao baixar imagem"}), 502
 
 
-# Detecta o diretório de decks do Cockatrice automaticamente
 def _find_cockatrice_dir() -> Path:
     candidates = [
+        Path("/cockatrice/decks"),
         Path.home() / "AppData" / "Local" / "Cockatrice" / "Cockatrice" / "decks",
         Path.home() / ".local" / "share" / "Cockatrice" / "Cockatrice" / "decks",
         Path.home() / "Library" / "Application Support" / "Cockatrice" / "decks",
@@ -466,21 +509,19 @@ def _find_cockatrice_dir() -> Path:
     for c in candidates:
         if c.exists():
             return c
-    return candidates[0]  # retorna o padrão Windows mesmo se não existir
+    return candidates[0]
 
 COCKATRICE_DIR = _find_cockatrice_dir()
 
 
 @app.route("/api/card-info")
 def card_info():
-    """Busca type_line + imagens por nome exato (para enriquecer cartas sem type_line)."""
     name = request.args.get("name", "").strip()
     lang = request.args.get("lang", "en").strip() or "en"
     if not name:
         return jsonify({"error": "Nome obrigatório"}), 400
     r = scryfall(f"{SCRYFALL}/cards/named", exact=name, lang=lang)
     if not r.ok:
-        # Fallback: busca fuzzy
         r = scryfall(f"{SCRYFALL}/cards/named", fuzzy=name)
         if not r.ok:
             return jsonify({"error": f"Carta não encontrada: {name}"}), 404
@@ -489,7 +530,6 @@ def card_info():
 
 @app.route("/api/cockatrice/decks")
 def cockatrice_decks():
-    """Lista todos os arquivos .cod no diretório Cockatrice."""
     if not COCKATRICE_DIR.exists():
         return jsonify({"error": "Diretório Cockatrice não encontrado", "decks": []}), 200
     decks = []
@@ -501,14 +541,9 @@ def cockatrice_decks():
             deck_name = (name_el.text or "").strip() if name_el is not None else ""
             if not deck_name:
                 deck_name = f.stem
-            # Conta total de cartas no main
             main_zone = root.find(".//zone[@name='main']")
             total = sum(int(c.get("number", 1)) for c in (main_zone or []))
-            decks.append({
-                "filename": f.name,
-                "name":     deck_name,
-                "total":    total,
-            })
+            decks.append({"filename": f.name, "name": deck_name, "total": total})
         except Exception:
             decks.append({"filename": f.name, "name": f.stem, "total": 0})
     return jsonify({"decks": decks})
@@ -516,8 +551,10 @@ def cockatrice_decks():
 
 @app.route("/api/cockatrice/deck/<path:filename>")
 def cockatrice_read(filename: str):
-    """Lê e parseia um arquivo .cod, retorna lista {name, qty, zone}."""
-    p = COCKATRICE_DIR / filename
+    try:
+        p = _safe_path(COCKATRICE_DIR, filename)
+    except ValueError:
+        abort(404)
     if not p.exists() or p.suffix != ".cod":
         return jsonify({"error": "Arquivo não encontrado"}), 404
     try:
@@ -535,16 +572,12 @@ def cockatrice_read(filename: str):
                     "zone": zone_name,
                 })
         return jsonify({"name": deck_name or p.stem, "filename": filename, "cards": cards})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "Erro ao ler arquivo"}), 500
 
 
 @app.route("/api/cockatrice/save", methods=["POST"])
 def cockatrice_save():
-    """
-    Salva o deck atual em formato .cod.
-    Body: { filename: "nome.cod", deckname: "Nome", cards: [{name, qty, zone}] }
-    """
     data     = request.get_json(silent=True) or {}
     filename = data.get("filename", "").strip()
     deckname = data.get("deckname", "").strip()
@@ -554,16 +587,19 @@ def cockatrice_save():
         return jsonify({"error": "filename obrigatório"}), 400
     if not filename.endswith(".cod"):
         filename += ".cod"
-    # Segurança: não permitir path traversal
-    p = (COCKATRICE_DIR / Path(filename).name)
+
     if not COCKATRICE_DIR.exists():
         return jsonify({"error": "Diretório Cockatrice não encontrado"}), 400
+
+    try:
+        p = _safe_path(COCKATRICE_DIR, filename)
+    except ValueError:
+        return jsonify({"error": "Nome de arquivo inválido"}), 400
 
     root = ET.Element("cockatrice_deck", version="1")
     ET.SubElement(root, "deckname").text = deckname
     ET.SubElement(root, "comments").text = ""
 
-    # Agrupa por zona
     zones: dict[str, list] = {}
     for c in cards:
         z = c.get("zone", "main")
@@ -586,6 +622,6 @@ def cockatrice_save():
 
 
 if __name__ == "__main__":
+    debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
     print("MTG Craft rodando em http://localhost:5001")
-    # use_reloader=False evita problema de SSL no child process do Werkzeug reloader (WSL2)
-    app.run(host="0.0.0.0", port=5001, debug=True, use_reloader=False)
+    app.run(host="0.0.0.0", port=5001, debug=debug, use_reloader=False)

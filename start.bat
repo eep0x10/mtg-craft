@@ -1,4 +1,6 @@
 @echo off
-echo Iniciando MTG Craft em http://localhost:5001
-wsl -e bash -c "cd /mnt/c/Users/eep0x10/Projects/dev/card-pdf-gen && python3 app.py"
-pause
+set PATH=%PATH%;C:\Program Files\Docker\Docker\resources\bin
+echo Iniciando MTG Craft...
+docker compose -f "%~dp0docker-compose.yml" up --build -d
+echo.
+echo Acesse: http://localhost:5001
