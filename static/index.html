@@ -994,10 +994,11 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 }
 
 .deck-stats-block {
-  padding: 10px 14px 8px;
+  padding: 8px 14px 10px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  /* works both inside flex-column and as a direct child of .panel */
 }
 .dsb-title {
   font-family: 'Cinzel', serif;
@@ -1048,7 +1049,9 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 .lang-select:focus, .lang-select:hover { border-color: var(--gold2); color: var(--text); }
 
 @media (max-width: 767px) {
-  .deck-stats-block { display: none; }
+  .deck-stats-block { padding: 6px 10px 8px; }
+  .dsb-grid { gap: 2px 10px; }
+  .dsb-row { font-size: 10px; }
 }
 </style>
 </head>
@@ -1189,6 +1192,20 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
     <span class="panel-title">Lista do Deck</span>
     <span id="deckCountBadge" style="margin-left:auto;font-size:10px;color:var(--muted)"></span>
   </div>
+  <!-- Deck stats block -->
+  <div class="deck-stats-block" id="deckStats">
+    <div class="dsb-title">Composição do Deck</div>
+    <div class="dsb-grid" id="dsbGrid">
+      <div class="dsb-row"><span class="dsb-lbl">🐉 Criaturas</span><span class="dsb-val zero" id="dsbCreature">0</span></div>
+      <div class="dsb-row"><span class="dsb-lbl">⚡ Instantâneos</span><span class="dsb-val zero" id="dsbInstant">0</span></div>
+      <div class="dsb-row"><span class="dsb-lbl">🌀 Feitiços</span><span class="dsb-val zero" id="dsbSorcery">0</span></div>
+      <div class="dsb-row"><span class="dsb-lbl">🏔️ Terrenos</span><span class="dsb-val zero" id="dsbLand">0</span></div>
+      <div class="dsb-row"><span class="dsb-lbl">⚙️ Artefatos</span><span class="dsb-val zero" id="dsbArtifact">0</span></div>
+      <div class="dsb-row"><span class="dsb-lbl">🌿 Encantamentos</span><span class="dsb-val zero" id="dsbEnchantment">0</span></div>
+      <div class="dsb-row"><span class="dsb-lbl">✨ Planeswalkers</span><span class="dsb-val zero" id="dsbPlaneswalker">0</span></div>
+      <div class="dsb-row"><span class="dsb-lbl">📦 Outros</span><span class="dsb-val zero" id="dsbOther">0</span></div>
+    </div>
+  </div>
   <div class="panel-body" style="padding: 12px 14px">
     <div id="deckList">
       <div class="empty-state">
@@ -1226,20 +1243,6 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
     <span class="panel-title">Workbench</span>
   </div>
   <div class="wb-panel-body">
-    <!-- Deck stats block -->
-    <div class="deck-stats-block" id="deckStats">
-      <div class="dsb-title">Composição do Deck</div>
-      <div class="dsb-grid" id="dsbGrid">
-        <div class="dsb-row"><span class="dsb-lbl">🐉 Criaturas</span><span class="dsb-val zero" id="dsbCreature">0</span></div>
-        <div class="dsb-row"><span class="dsb-lbl">⚡ Instantâneos</span><span class="dsb-val zero" id="dsbInstant">0</span></div>
-        <div class="dsb-row"><span class="dsb-lbl">🌀 Feitiços</span><span class="dsb-val zero" id="dsbSorcery">0</span></div>
-        <div class="dsb-row"><span class="dsb-lbl">🏔️ Terrenos</span><span class="dsb-val zero" id="dsbLand">0</span></div>
-        <div class="dsb-row"><span class="dsb-lbl">⚙️ Artefatos</span><span class="dsb-val zero" id="dsbArtifact">0</span></div>
-        <div class="dsb-row"><span class="dsb-lbl">🌿 Encantamentos</span><span class="dsb-val zero" id="dsbEnchantment">0</span></div>
-        <div class="dsb-row"><span class="dsb-lbl">✨ Planeswalkers</span><span class="dsb-val zero" id="dsbPlaneswalker">0</span></div>
-        <div class="dsb-row"><span class="dsb-lbl">📦 Outros</span><span class="dsb-val zero" id="dsbOther">0</span></div>
-      </div>
-    </div>
     <!-- Preview scrollable -->
     <div class="wb-preview-scroll" id="previewScroll">
       <div id="preview">
