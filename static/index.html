@@ -850,6 +850,31 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
 }
 .sdi-del:hover { background: var(--danger); color: #fff; }
 
+/* ═══════════════════════════════════════════════════════════════
+   COCKATRICE
+═══════════════════════════════════════════════════════════════ */
+.cock-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 5px;
+  transition: border-color .15s;
+}
+.cock-item:hover { border-color: var(--gold2); }
+.cock-icon { font-size: 18px; flex-shrink: 0; }
+.cock-info { flex: 1; min-width: 0; }
+.cock-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cock-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.cock-load { flex-shrink: 0; padding: 4px 10px; background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%); color: #1a1000; border: none; border-radius: 6px; font-family: 'Cinzel', serif; font-size: 10px; font-weight: 700; cursor: pointer; letter-spacing: .5px; }
+.cock-load:hover { filter: brightness(1.12); }
+.cock-save-row { display: flex; gap: 6px; margin-bottom: 12px; }
+.cock-save-row input { flex: 1; }
+.cock-badge { display: inline-block; background: #1a3a1a; color: #5aef8a; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-left: 6px; letter-spacing: .4px; }
+
 /* ─── URL import row ─────────────────────────────────────────── */
 .url-row {
   display: flex;
@@ -1099,6 +1124,7 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
       <div class="tab" data-tab="import">Lista</div>
       <div class="tab" data-tab="upload">Upload</div>
       <div class="tab" data-tab="decks">Decks</div>
+      <div class="tab" data-tab="cockatrice">🐓</div>
     </div>
 
     <!-- Tab: Search -->
@@ -1165,6 +1191,28 @@ input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
       <input type="text" id="imgUrlInput" placeholder="https://… (URL da imagem da carta)" style="margin-bottom:6px">
       <input type="text" id="imgUrlName" placeholder="Nome da carta (opcional)" style="margin-bottom:6px">
       <button class="btn" id="imgUrlBtn" style="width:100%">↓ Adicionar Imagem</button>
+    </div>
+
+    <!-- Tab: Cockatrice -->
+    <div id="tabCockatrice" style="display:none">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.6">
+        Decks do Cockatrice detectados em<br>
+        <span style="color:var(--muted);font-size:10px;font-family:monospace">…\Cockatrice\decks\</span>
+      </div>
+      <!-- Save current deck to .cod -->
+      <div class="divider" style="margin-bottom:8px">salvar deck atual</div>
+      <div class="cock-save-row">
+        <input type="text" id="cockSaveFilename" placeholder="nome-do-arquivo.cod">
+        <button class="btn btn-sm" id="cockSaveBtn">💾 .cod</button>
+      </div>
+      <!-- List of .cod files -->
+      <div class="divider" style="margin-bottom:8px">decks salvos</div>
+      <div id="cockDecksList">
+        <div class="empty-state" style="padding:20px 0">
+          <span class="es-icon" style="font-size:24px">🐓</span>
+          Carregando…
+        </div>
+      </div>
     </div>
 
     <!-- Tab: Saved decks -->
@@ -1333,7 +1381,7 @@ document.querySelectorAll('#inputTabs .tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('#inputTabs .tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    ['tabSearch','tabImport','tabUpload','tabDecks'].forEach(id =>
+    ['tabSearch','tabImport','tabUpload','tabDecks','tabCockatrice'].forEach(id =>
       document.getElementById(id).style.display = 'none');
     document.getElementById('tab' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1)).style.display = '';
   });
@@ -1547,6 +1595,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   log.scrollTop = log.scrollHeight;
   btn.disabled = false;
   if (ok > 0) toast(`${ok} carta${ok>1?'s':''} adicionada${ok>1?'s':''}`, 'ok');
+  setTimeout(() => enrichTypeLine(), 300);
 });
 
 // ── Botão "💾 Novo deck…" ─────────────────────────────────────
@@ -2110,7 +2159,9 @@ async function importDeckByUrl() {
   if (isMobile()) switchMobilePanel(1);
   if (deckName) {
     document.getElementById('saveDeckName').value = deckName;
+    document.getElementById('cockSaveFilename').value = deckName.replace(/[^a-zA-Z0-9_-]/g, '_') + '.cod';
   }
+  setTimeout(() => enrichTypeLine(), 300);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2152,6 +2203,186 @@ document.getElementById('imgUrlBtn').addEventListener('click', async () => {
     btn.innerHTML = '↓ Adicionar Imagem';
   }
 });
+// ═══════════════════════════════════════════════════════════════
+// Enriquecimento de type_line (para cartas sem esse campo)
+// ═══════════════════════════════════════════════════════════════
+async function enrichTypeLine() {
+  const missing = deck.filter(c => !c.type_line && c.name && c.type !== 'upload');
+  if (!missing.length) return;
+  for (const card of missing) {
+    try {
+      const r = await fetch(`/api/card-info?name=${encodeURIComponent(card.name)}`);
+      if (r.ok) {
+        const d = await r.json();
+        card.type_line = d.type_line || '';
+        // Aproveita para atualizar imagens se estiver faltando
+        if (!card.normal && d.normal) card.normal = d.normal;
+        if (!card.thumb  && d.thumb)  card.thumb  = d.thumb;
+      }
+    } catch { /* silencioso */ }
+    await new Promise(r => setTimeout(r, 80)); // respeita rate limit Scryfall
+  }
+  renderDeckStats();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Cockatrice Integration
+// ═══════════════════════════════════════════════════════════════
+let cockCurrentFile = null; // arquivo .cod aberto no momento
+
+async function loadCockatriceDeckList() {
+  const el = document.getElementById('cockDecksList');
+  el.innerHTML = '<div class="empty-state" style="padding:12px 0"><span class="spinner"></span> Lendo pasta…</div>';
+  try {
+    const r = await fetch('/api/cockatrice/decks');
+    const data = await r.json();
+    if (data.error && !data.decks?.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:16px 0;color:var(--warn)">⚠ ${data.error}</div>`;
+      return;
+    }
+    const decks = data.decks || [];
+    if (!decks.length) {
+      el.innerHTML = '<div class="empty-state" style="padding:16px 0"><span class="es-icon">📂</span>Nenhum .cod encontrado</div>';
+      return;
+    }
+    el.innerHTML = decks.map(d => `
+      <div class="cock-item">
+        <span class="cock-icon">🐓</span>
+        <div class="cock-info">
+          <div class="cock-name">
+            ${d.name}
+            ${cockCurrentFile === d.filename ? '<span class="cock-badge">ABERTO</span>' : ''}
+          </div>
+          <div class="cock-meta">${d.filename} · ${d.total} cartas</div>
+        </div>
+        <button class="cock-load" onclick='loadCockatriceDeck(${JSON.stringify(d.filename)}, ${JSON.stringify(d.name)})'>Abrir</button>
+      </div>
+    `).join('');
+  } catch {
+    el.innerHTML = '<div class="empty-state" style="color:var(--danger)">Erro ao conectar com o servidor</div>';
+  }
+}
+
+async function loadCockatriceDeck(filename, deckName) {
+  toast(`Abrindo ${deckName}…`, '');
+  try {
+    const r = await fetch(`/api/cockatrice/deck/${encodeURIComponent(filename)}`);
+    const data = await r.json();
+    if (!r.ok) { toast(data.error, 'err'); return; }
+
+    // Limpa deck atual e carrega as cartas
+    deck = [];
+    renderDeck(); renderPreview();
+    cockCurrentFile = filename;
+
+    // Preenche nome do arquivo no campo de save
+    document.getElementById('cockSaveFilename').value = filename;
+    // Preenche nome do deck no campo de save de deck (aba Decks)
+    document.getElementById('saveDeckName').value = data.name;
+
+    loadCockatriceDeckList(); // atualiza badge ABERTO
+
+    // Importa cada carta buscando no Scryfall
+    const mainCards = data.cards.filter(c => c.zone === 'main');
+    const sideCards = data.cards.filter(c => c.zone === 'side');
+    const allCards  = [...mainCards, ...sideCards];
+
+    let ok = 0, fail = 0;
+    for (const entry of allCards) {
+      try {
+        const r2 = await fetch(`/api/card-info?name=${encodeURIComponent(entry.name)}&lang=${activeLang}`);
+        if (r2.ok) {
+          const card = await r2.json();
+          // marca zona para eventual save-back
+          card._zone = entry.zone;
+          addCard(card, entry.qty, true);
+          ok++;
+        } else {
+          // Carta não encontrada no Scryfall (tokens, custom, etc.)
+          deck.push({
+            id:       `cock_${entry.name.replace(/\s/g,'_')}`,
+            name:     entry.name,
+            set_name: '',
+            set_code: '',
+            thumb:    '',
+            normal:   '',
+            png:      '',
+            type_line: '',
+            is_dfc:   false,
+            qty:      entry.qty,
+            _zone:    entry.zone,
+            type:     'cockatrice',
+          });
+          renderDeck(); renderPreview();
+          fail++;
+        }
+      } catch {
+        fail++;
+      }
+      await new Promise(r => setTimeout(r, 80));
+    }
+    renderDeck(); renderPreview();
+    toast(`${deckName} carregado — ${ok} cartas${fail ? ' · '+fail+' não encontradas' : ''}`, 'ok');
+    if (isMobile()) switchMobilePanel(1);
+  } catch (e) {
+    toast('Erro ao abrir deck: ' + e.message, 'err');
+  }
+}
+
+async function saveCockatriceDeck() {
+  if (!deck.length) { toast('Deck vazio', 'err'); return; }
+  let filename = document.getElementById('cockSaveFilename').value.trim();
+  if (!filename) { toast('Informe o nome do arquivo', 'err'); return; }
+  if (!filename.endsWith('.cod')) filename += '.cod';
+
+  const deckName = document.getElementById('saveDeckName').value.trim()
+                || filename.replace('.cod', '');
+
+  // Monta lista preservando zone (_zone ou default 'main')
+  const cards = deck
+    .filter(c => c.type !== 'upload') // uploads não têm nome real para o Cockatrice
+    .map(c => ({
+      name: c.name,
+      qty:  c.qty,
+      zone: c._zone || 'main',
+    }));
+
+  const btn = document.getElementById('cockSaveBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/cockatrice/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename, deckname: deckName, cards }),
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error, 'err'); return; }
+    cockCurrentFile = d.saved;
+    document.getElementById('cockSaveFilename').value = d.saved;
+    loadCockatriceDeckList();
+    toast(`Salvo: ${d.saved}`, 'ok');
+  } catch {
+    toast('Erro ao salvar .cod', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('cockSaveBtn').addEventListener('click', saveCockatriceDeck);
+
+// Carrega lista ao abrir a aba Cockatrice
+document.querySelectorAll('#inputTabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    if (tab.dataset.tab === 'cockatrice') loadCockatriceDeckList();
+  });
+});
+
+// Enriquece type_line quando uma função loadSavedDeck ou importDeckByUrl termina
+const _origLoadSavedDeck = loadSavedDeck;
+function loadSavedDeck(name) {
+  _origLoadSavedDeck(name);
+  setTimeout(() => enrichTypeLine(), 200);
+}
 </script>
 </body>
 </html>

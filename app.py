@@ -11,6 +11,10 @@ Endpoints:
   POST /api/generate           → gera e retorna o PDF
   POST /api/import-deck-url    → importa deck por URL (Moxfield, Archidekt)
   POST /api/proxy-image        → baixa imagem de URL externa (MTGBuilder, etc.)
+  GET  /api/card-info?name=    → busca type_line + imagens por nome exato
+  GET  /api/cockatrice/decks   → lista arquivos .cod no diretório Cockatrice
+  GET  /api/cockatrice/deck/<f>→ lê e parseia um arquivo .cod
+  POST /api/cockatrice/save    → salva deck atual como .cod
 """
 
 import hashlib
@@ -19,6 +23,7 @@ import re
 import tempfile
 import time
 import uuid
+import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
@@ -436,6 +441,123 @@ def proxy_image():
         })
     except Exception as e:
         return jsonify({"error": f"Erro ao baixar imagem: {e}"}), 502
+
+
+COCKATRICE_DIR = Path(r"C:\Users\eep0x10\AppData\Local\Cockatrice\Cockatrice\decks")
+
+
+@app.route("/api/card-info")
+def card_info():
+    """Busca type_line + imagens por nome exato (para enriquecer cartas sem type_line)."""
+    name = request.args.get("name", "").strip()
+    lang = request.args.get("lang", "en").strip() or "en"
+    if not name:
+        return jsonify({"error": "Nome obrigatório"}), 400
+    r = scryfall(f"{SCRYFALL}/cards/named", exact=name, lang=lang)
+    if not r.ok:
+        # Fallback: busca fuzzy
+        r = scryfall(f"{SCRYFALL}/cards/named", fuzzy=name)
+        if not r.ok:
+            return jsonify({"error": f"Carta não encontrada: {name}"}), 404
+    return jsonify(card_data(r.json()))
+
+
+@app.route("/api/cockatrice/decks")
+def cockatrice_decks():
+    """Lista todos os arquivos .cod no diretório Cockatrice."""
+    if not COCKATRICE_DIR.exists():
+        return jsonify({"error": "Diretório Cockatrice não encontrado", "decks": []}), 200
+    decks = []
+    for f in sorted(COCKATRICE_DIR.glob("*.cod")):
+        try:
+            tree = ET.parse(str(f))
+            root = tree.getroot()
+            name_el = root.find("deckname")
+            deck_name = (name_el.text or "").strip() if name_el is not None else ""
+            if not deck_name:
+                deck_name = f.stem
+            # Conta total de cartas no main
+            main_zone = root.find(".//zone[@name='main']")
+            total = sum(int(c.get("number", 1)) for c in (main_zone or []))
+            decks.append({
+                "filename": f.name,
+                "name":     deck_name,
+                "total":    total,
+            })
+        except Exception:
+            decks.append({"filename": f.name, "name": f.stem, "total": 0})
+    return jsonify({"decks": decks})
+
+
+@app.route("/api/cockatrice/deck/<path:filename>")
+def cockatrice_read(filename: str):
+    """Lê e parseia um arquivo .cod, retorna lista {name, qty, zone}."""
+    p = COCKATRICE_DIR / filename
+    if not p.exists() or p.suffix != ".cod":
+        return jsonify({"error": "Arquivo não encontrado"}), 404
+    try:
+        tree = ET.parse(str(p))
+        root = tree.getroot()
+        name_el = root.find("deckname")
+        deck_name = (name_el.text or "").strip() if name_el is not None else p.stem
+        cards = []
+        for zone in root.findall("zone"):
+            zone_name = zone.get("name", "main")
+            for card in zone.findall("card"):
+                cards.append({
+                    "name": card.get("name", ""),
+                    "qty":  int(card.get("number", 1)),
+                    "zone": zone_name,
+                })
+        return jsonify({"name": deck_name or p.stem, "filename": filename, "cards": cards})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cockatrice/save", methods=["POST"])
+def cockatrice_save():
+    """
+    Salva o deck atual em formato .cod.
+    Body: { filename: "nome.cod", deckname: "Nome", cards: [{name, qty, zone}] }
+    """
+    data     = request.get_json(silent=True) or {}
+    filename = data.get("filename", "").strip()
+    deckname = data.get("deckname", "").strip()
+    cards    = data.get("cards", [])
+
+    if not filename:
+        return jsonify({"error": "filename obrigatório"}), 400
+    if not filename.endswith(".cod"):
+        filename += ".cod"
+    # Segurança: não permitir path traversal
+    p = (COCKATRICE_DIR / Path(filename).name)
+    if not COCKATRICE_DIR.exists():
+        return jsonify({"error": "Diretório Cockatrice não encontrado"}), 400
+
+    root = ET.Element("cockatrice_deck", version="1")
+    ET.SubElement(root, "deckname").text = deckname
+    ET.SubElement(root, "comments").text = ""
+
+    # Agrupa por zona
+    zones: dict[str, list] = {}
+    for c in cards:
+        z = c.get("zone", "main")
+        zones.setdefault(z, []).append(c)
+
+    for zone_name, zone_cards in zones.items():
+        zone_el = ET.SubElement(root, "zone", name=zone_name)
+        for c in zone_cards:
+            ET.SubElement(zone_el, "card",
+                          number=str(c.get("qty", 1)),
+                          name=c.get("name", ""))
+
+    tree = ET.ElementTree(root)
+    ET.indent(tree, space="    ")
+    with open(str(p), "wb") as f:
+        f.write(b'<?xml version="1.0" encoding="UTF-8"?>\n')
+        tree.write(f, encoding="unicode", xml_declaration=False)
+
+    return jsonify({"ok": True, "saved": p.name})
 
 
 if __name__ == "__main__":
